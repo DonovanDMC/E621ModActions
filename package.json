@@ -4,7 +4,9 @@
   "description": "A parser for https://e621.net/mod_actions.",
   "main": "index.js",
   "scripts": {
-    "prepublishOnly": "tsc -p tsc.json && cp lib/types.d.ts dist/lib"
+    "prepublishOnly": "tsc -p tsc.json && cp lib/types.d.ts dist/lib",
+    "build": "npm run prepublishOnly",
+    "test": "npx mocha"
   },
   "repository": {
     "type": "git",
