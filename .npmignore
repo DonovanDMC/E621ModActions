@@ -1,0 +1,9 @@
+local/
+test/
+lib/
+.eslintrc.json
+.gitignore
+.mocharc.json
+.node-version
+tsconfig.json
+tsconfig.transpile.json

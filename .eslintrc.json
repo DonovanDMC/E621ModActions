@@ -1,0 +1,11 @@
+{
+  "extends": "@uwu-codes/eslint-config/esm",
+  "rules": {
+    "@typescript-eslint/no-empty-interface": [
+      "error",
+      {
+        "allowSingleExtends": true
+      }
+    ]
+  }
+}
