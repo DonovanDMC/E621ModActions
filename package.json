@@ -2,13 +2,14 @@
   "name": "e621-mod-actions",
   "version": "1.0.0",
   "description": "A parser for https://e621.net/mod_actions.",
-  "main": "index.js",
+  "main": "dist/lib/index.js",
   "scripts": {
-    "prepublishOnly": "tsc -p tsc.json && cp lib/types.d.ts dist/lib",
+    "prepublishOnly": "rm -rf dist && tsc -p tsc.json && cp lib/types.d.ts dist/lib",
     "build": "npm run prepublishOnly",
     "test": "npx mocha",
     "lint": "eslint lib --ext .ts",
-    "lint:fix": "eslint lib --ext .ts --fix"
+    "lint:fix": "eslint lib --ext .ts --fix",
+    "test:docs": "npm i --no-save --ignore-scripts typedoc typedoc-plugin-extras typedoc-plugin-rename-defaults && node scripts/doc-test.js && npx --yes typedoc"
   },
   "repository": {
     "type": "git",
@@ -43,8 +44,7 @@
   },
   "type": "module",
   "dependencies": {
-    "jsdom": "^21.1.1",
-    "parse5": "^7.1.2"
+    "jsdom": "^21.1.1"
   },
   "engines": {
     "node": "^16.15.0 || ^17.5.0 || >=18"
