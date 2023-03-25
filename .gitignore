@@ -1,3 +1,7 @@
 local/
 node_modules/
 dist/
+docs/
+dark.cjs
+favicon.ico
+typedoc.json

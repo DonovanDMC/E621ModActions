@@ -36,8 +36,8 @@ export interface ClientOptions {
     baseURL?: string;
     /**
      * The User-Agent header used within requests. If `authUser` is provided, it will be appended to the end of the default user agent.
-     * @defaultValue E621ModActions/${version} (+https://github.com/DonovanDMC/E621ModActions)
-     * @defaultValue E621ModActions/${version} (+https://github.com/DonovanDMC/E621ModActions; {user})
+     * @defaultValue E621ModActions/\{version\} (+https://github.com/DonovanDMC/E621ModActions)
+     * @defaultValue E621ModActions/\{version\} (+https://github.com/DonovanDMC/E621ModActions; \{user\})
      */
     userAgent?: string;
 }

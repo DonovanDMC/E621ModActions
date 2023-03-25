@@ -4,7 +4,6 @@ try {
     debug = (await import("debug")).default;
 } catch {}
 
-/** @hidden */
 export default function Debug(name: string, ...extra: Array<unknown>) {
     let first: unknown;
     if (extra.length === 0) {

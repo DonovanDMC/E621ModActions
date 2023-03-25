@@ -542,7 +542,7 @@ describe("Parsing", function () {
     });
 
     it(ActionTypes.REPORT_REASON_UPDATE, async function () {
-        const [single = null, oneToTwo = null, twoToOne = null] = await client.search({ action: ActionTypes.REPORT_REASON_CREATE });
+        const [single = null, oneToTwo = null, twoToOne = null] = await client.search({ action: ActionTypes.REPORT_REASON_UPDATE });
 
         if (single === null || oneToTwo === null || twoToOne === null) {
             return this.skip();

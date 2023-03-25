@@ -3,9 +3,13 @@ test/
 lib/
 scripts/
 .github/
+docs/
 .eslintrc.json
 .gitignore
 .mocharc.json
 .node-version
 tsconfig.json
 tsc.json
+dark.cjs
+favicon.ico
+typedoc.json
