@@ -1,6 +1,6 @@
 # E621 Mod Actions
 
-A parser for https://e621.net/mod_actions. Do note since this is parsing html, issues should be expected. Various things such as some entries not being parsed correctly, entries being categorized as the wrong type, and more. I've made this to the best of my ability.
+A parser for https://e621.net/mod_actions. Do note since this is parsing html, issues should be expected. Various things such as some entries not being parsed correctly, entries being categorized as the wrong type, and more. I've made this to the best of my ability. There's some generated documentation [here](https://npm.e621.ws/e621-mod-actions)
 
 ### Usage
 This module has been built specifically with ES Modules in mind.
