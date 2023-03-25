@@ -1,7 +1,7 @@
 import { writeFile } from "node:fs/promises";
 
 const dir = new URL("../", import.meta.url).pathname;
-await writeFile(`${dir}/dark.js`, "\n\
+await writeFile(`${dir}/dark.cjs`, "\n\
 const { JSX } = require(\"typedoc\");\n\
 \n\
 // https://github.com/TypeStrong/typedoc/issues/1840#issuecomment-1012736455\n\
@@ -21,7 +21,7 @@ await writeFile(`${dir}/typedoc.json`, JSON.stringify({
     plugin: [
         "typedoc-plugin-rename-defaults",
         "typedoc-plugin-extras",
-        `${dir}/dark.js`
+        `${dir}/dark.cjs`
     ],
     tsconfig:           "tsconfig.json",
     entryPointStrategy: "expand",
