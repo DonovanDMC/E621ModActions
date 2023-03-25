@@ -6,7 +6,9 @@
   "scripts": {
     "prepublishOnly": "tsc -p tsc.json && cp lib/types.d.ts dist/lib",
     "build": "npm run prepublishOnly",
-    "test": "npx mocha"
+    "test": "npx mocha",
+    "lint": "eslint lib --ext .ts",
+    "lint:fix": "eslint lib --ext .ts --fix"
   },
   "repository": {
     "type": "git",
