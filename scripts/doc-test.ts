@@ -11,7 +11,7 @@ exports.load = function load(app) {\n\
 		JSX.createElement(JSX.Raw, { html: \"localStorage.setItem('tsd-theme', localStorage.getItem('tsd-theme') || 'dark')\" }));\n\
 	});\n\
 }");
-// note for anyone changing this, this does not affect the docs on https://npm.e621.ws/mod-actions
+// note for anyone changing this, this does not affect the docs on https://npm.e621.ws/e621-mod-actions
 // this only effects the test workflow - let a maintainer know if something needs to change here
 await writeFile(`${dir}/typedoc.json`, JSON.stringify({
     name:        "E621 Mod Actions",

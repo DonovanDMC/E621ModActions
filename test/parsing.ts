@@ -5,19 +5,6 @@ import type { AnyAction, ActionMap } from "../lib/types.js";
 import E621ModActions from "../lib/index.js";
 import { expect } from "chai";
 import assert from "node:assert";
-
-global.fetch = (info: RequestInfo | URL) => {
-    assert(typeof info === "string");
-    const type = /search\[action]=(\w+)/.exec(decodeURIComponent(info))![1] as ActionTypes;
-    const data = testData[type] === null ? [] : (Array.isArray(testData[type]) ? testData[type] as Array<string> : [testData[type] as string]);
-    return Promise.resolve(new Response(`<html><head><title> Mod Actions\n - e621</title></head><body><div id="c-mod-actions"><table><tbody>${data.map(d => `<tr>${testData._time}${testData._user}${d}</tr>`.replace(/&quot;/g, "\"")).join("")}</tbody></table></div></body></html>`, {
-        status:  200,
-        headers: {
-            "Content-Type": "text/html"
-        }
-    }));
-};
-
 const expectedDate = new Date(/datetime=&quot;(\d{4}(?:-\d{2}){2}T\d{2}:\d{2}-\d{4})/.exec(testData._time)![1]);
 
 function standard<T extends ActionTypes = ActionTypes>(type: T, data: AnyAction): asserts data is ActionMap[T] {
@@ -27,7 +14,19 @@ function standard<T extends ActionTypes = ActionTypes>(type: T, data: AnyAction)
     expect(data.blame.name).to.eq("Admin");
 }
 
-const client = new E621ModActions();
+const client = new E621ModActions({
+    _fetch(input) {
+        assert(typeof input === "string");
+        const type = /search\[action]=(\w+)/.exec(decodeURIComponent(input))![1] as ActionTypes;
+        const data = testData[type] === null ? [] : (Array.isArray(testData[type]) ? testData[type] as Array<string> : [testData[type] as string]);
+        return Promise.resolve(new Response(`<html><head><title> Mod Actions\n - e621</title></head><body><div id="c-mod-actions"><table><tbody>${data.map(d => `<tr>${testData._time}${testData._user}${d}</tr>`.replace(/&quot;/g, "\"")).join("")}</tbody></table></div></body></html>`, {
+            status:  200,
+            headers: {
+                "Content-Type": "text/html"
+            }
+        }));
+    }
+});
 describe("Parsing", function () {
     it(ActionTypes.ARTIST_PAGE_RENAME, async function () {
         const [data = null] = await client.search({ action: ActionTypes.ARTIST_PAGE_RENAME });

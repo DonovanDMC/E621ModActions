@@ -27,9 +27,11 @@ process.nextTick(async() => {
 ```
 
 ### NodeJS Versions
-Only `18.0.0` and above are officially supported, but some lower versions can be used with flags.
+Only `18.0.0` and above are officially supported, but some lower versions can be used with flags. Other older versions may be usable by providing a fetch pollyfill via `global.fetch` or the `_fetch` option. See below the table for the technical details required for a pollyfill. https://npm.im/node-fetch and https://npm.im/undici have both been tested and seen to work.
 | Node Version |                 Info                 |
 |:------------:|:------------------------------------:|
 |   ^16.15.0   | With the `--experimental-fetch` flag |
 |    ^17.5.0   | With the `--experimental-fetch` flag |
 |   >=18.0.0   |                                      |
+
+At minimum, a pollyfill fetch must accept `(input: string, init: { headers: Record<string, string>})` and return `{ status: number; statusText: string; text(): Promise<string> }`.
