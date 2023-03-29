@@ -1,6 +1,6 @@
 {
   "name": "e621-mod-actions",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "A parser for https://e621.net/mod_actions.",
   "main": "dist/lib/index.js",
   "scripts": {

@@ -7,6 +7,18 @@ import type { ActionMap } from "./types.js";
 import pkg from "../package.json" assert { type: "json" };
 import { JSDOM } from "jsdom";
 
+
+const MakeError = (name: string) => class extends Error {
+    override name = name;
+};
+
+export const NonOKStatusError = MakeError("NonOKStatusError");
+export const RateLimitedError = MakeError("RateLimitedError");
+export const MaintenanceError = MakeError("MaintenanceError");
+export const ParsingError = MakeError("ParsingError");
+
+const RatelimitedContent = "<h1>503 Rate Limited</h1>";
+const MaintenanceContent = "<title>e621 Maintenance</title>";
 export interface ClientOptions {
     /** The api key to use for authentication. Api keys made before March 2020 will be 32 characters, keys created afterwards will be 24 characters. This should be paired with `authUser`. Viewing mod actions does not require authentication, but we'll still pass it on anyways. */
     authKey?: string | null;
@@ -99,20 +111,34 @@ export default class E621ModActions {
         Debug(`<- GET /mod_actions${qs} (${Timer.calc(start, Timer.now())})`);
 
         if (res.status !== 200) {
-            throw new Error(`Request failed with status: ${res.status} ${res.statusText}`);
+            if (res.status === 503) {
+                const html = await res.text();
+                if (html.includes(RatelimitedContent)) {
+                    throw new RateLimitedError("You are being rate limited. Please wait a few minutes and try again.");
+                }
+
+                if (html.includes(MaintenanceContent)) {
+                    throw new MaintenanceError("E621 is currently undergoing maintenance. Please try again later.");
+                }
+            }
+            throw new NonOKStatusError(`Request failed with status: ${res.status} ${res.statusText}`);
         }
 
         const html = (await res.text()).replace(/<br(?: \/)?>/g, "\n");
         if (!this.options.disableTitleCheck) {
-            // hacky test for maintenance page/getting blocked
+            // hacky test for captchas
             const title = /<title>(?<title>.+)<\/title>/is.exec(html)?.groups?.title.trim().replace(/\r?\n/g, "");
             if (title === undefined || title !== "Mod Actions - e621") {
-                throw new Error(`There seems to have been an issue loading the mod actions page. Expected title="Mod Actions - e621", got ${title === undefined ? "none" : `title="${title}"`}`);
+                throw new ParsingError(`There seems to have been an issue loading the mod actions page. Expected title="Mod Actions - e621", got ${title === undefined ? "none" : `title="${title}"`}`);
             }
         }
 
-        const { window: { document } } = new JSDOM(html);
-        return Array.from(document.querySelectorAll<HTMLTableRowElement>("div#c-mod-actions table tbody tr"));
+        try {
+            const { window: { document } } = new JSDOM(html);
+            return Array.from(document.querySelectorAll<HTMLTableRowElement>("div#c-mod-actions table tbody tr"));
+        } catch (err) {
+            throw new ParsingError("Parsing the modactions page failed.", { cause: err });
+        }
     }
 
     async search<T extends ActionTypes = ActionTypes>(options?: SearchOptions<T>, useLegacyActions?: boolean) {
