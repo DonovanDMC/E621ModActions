@@ -448,23 +448,33 @@ describe("Parsing", function () {
     });
 
     it(ActionTypes.IP_BAN_CREATE, async function () {
-        const [data = null] = await client.search({ action: ActionTypes.IP_BAN_CREATE });
+        const [data = null, withIP = null] = await client.search({ action: ActionTypes.IP_BAN_CREATE });
 
-        if (data === null) {
+        if (data === null || withIP === null) {
             return this.skip();
         }
 
         standard(ActionTypes.IP_BAN_CREATE, data);
+        expect(data.ipAddress).to.eq(null);
+        expect(data.reason).to.eq(null);
+        standard(ActionTypes.IP_BAN_CREATE, withIP);
+        expect(withIP.ipAddress).to.eq("127.0.0.1");
+        expect(withIP.reason).to.eq("test");
     });
 
     it(ActionTypes.IP_BAN_DELETE, async function () {
-        const [data = null] = await client.search({ action: ActionTypes.IP_BAN_DELETE });
+        const [data = null, withIP = null] = await client.search({ action: ActionTypes.IP_BAN_DELETE });
 
-        if (data === null) {
+        if (data === null || withIP === null) {
             return this.skip();
         }
 
         standard(ActionTypes.IP_BAN_DELETE, data);
+        expect(data.ipAddress).to.eq(null);
+        expect(data.reason).to.eq(null);
+        standard(ActionTypes.IP_BAN_DELETE, withIP);
+        expect(withIP.ipAddress).to.eq("127.0.0.1");
+        expect(withIP.reason).to.eq("test");
     });
 
     it(ActionTypes.MASCOT_CREATE, async function () {

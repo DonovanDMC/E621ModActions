@@ -90,19 +90,24 @@ export default function parse(element: HTMLTableRowElement, useLegacyActions = f
         };
     }
 
-    if ((match = /^Created ip ban$/.exec(message))) {
+    // ip address & reason are only shown to admin+
+    if ((match = /^Created ip ban(?: (?<ip_address>(?:\d{1,3}\.){3}\d{1,3})\nBan reason: (?<reason>.+))?$/.exec(message))) {
         return {
             blame,
             date,
-            type: ActionTypes.IP_BAN_CREATE
+            ipAddress: match.groups!.ip_address ?? null,
+            reason:    match.groups!.reason ?? null,
+            type:      ActionTypes.IP_BAN_CREATE
         };
     }
 
-    if ((match = /^Removed ip ban$/.exec(message))) {
+    if ((match = /^Removed ip ban(?: (?<ip_address>(?:\d{1,3}\.){3}\d{1,3})\nBan reason: (?<reason>.+))?$/.exec(message))) {
         return {
             blame,
             date,
-            type: ActionTypes.IP_BAN_DELETE
+            ipAddress: match.groups!.ip_address ?? null,
+            reason:    match.groups!.reason ?? null,
+            type:      ActionTypes.IP_BAN_DELETE
         };
     }
 

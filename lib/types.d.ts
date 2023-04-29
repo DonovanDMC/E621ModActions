@@ -35,8 +35,14 @@ export interface TakedownDeleteAction extends BaseAction<ActionTypes.TAKEDOWN_DE
     };
 }
 
-export interface IPBanCreateAction extends BaseAction<ActionTypes.IP_BAN_CREATE> {}
-export interface IPBanDeleteAction extends BaseAction<ActionTypes.IP_BAN_DELETE> {}
+export interface IPBanCreateAction extends BaseAction<ActionTypes.IP_BAN_CREATE> {
+    ipAddress: string | null;
+    reason: string | null;
+}
+export interface IPBanDeleteAction extends BaseAction<ActionTypes.IP_BAN_DELETE> {
+    ipAddress: string | null;
+    reason: string | null;
+}
 
 export interface TicketUpdateAction extends BaseAction<ActionTypes.TICKET_UPDATE> {
     ticket: {

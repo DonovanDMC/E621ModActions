@@ -62,8 +62,14 @@
   "help_create": "<td class=&quot;dtext-container&quot;><div class=&quot;styled-dtext&quot;><p>Created help entry <a rel=&quot;nofollow&quot; class=&quot;dtext-link&quot; href=&quot;/help/test&quot;>test</a> (<a rel=&quot;nofollow&quot; class=&quot;dtext-link dtext-wiki-link&quot; href=&quot;/wiki_pages/show_or_new?title=help%3Atest&quot;>help:test</a>)</p></div></td>",
   "help_delete": "<td class=&quot;dtext-container&quot;><div class=&quot;styled-dtext&quot;><p>Deleted help entry <a rel=&quot;nofollow&quot; class=&quot;dtext-link&quot; href=&quot;/help/test&quot;>test</a> (<a rel=&quot;nofollow&quot; class=&quot;dtext-link dtext-wiki-link&quot; href=&quot;/wiki_pages/show_or_new?title=help%3Atest&quot;>help:test</a>)</p></div></td>",
   "help_update": "<td class=&quot;dtext-container&quot;><div class=&quot;styled-dtext&quot;><p>Edited help entry <a rel=&quot;nofollow&quot; class=&quot;dtext-link&quot; href=&quot;/help/test&quot;>test</a> (<a rel=&quot;nofollow&quot; class=&quot;dtext-link dtext-wiki-link&quot; href=&quot;/wiki_pages/show_or_new?title=help%3Atest&quot;>help:test</a>)</p></div></td>",
-  "ip_ban_create": "<td class=&quot;dtext-container&quot;><div class=&quot;styled-dtext&quot;><p>Created ip ban</p></div></td>",
-  "ip_ban_delete": "<td class=&quot;dtext-container&quot;><div class=&quot;styled-dtext&quot;><p>Removed ip ban</p></div></td>",
+  "ip_ban_create": [
+    "<td><div class=&quot;styled-dtext&quot;><p>Created ip ban</p></div></td>",
+    "<td><div class=&quot;styled-dtext&quot;><p>Created ip ban 127.0.0.1<br>Ban reason: test</p></div></td>"
+  ],
+  "ip_ban_delete": [
+    "<td><div class=&quot;styled-dtext&quot;><p>Removed ip ban</p></div></td>",
+    "<td><div class=&quot;styled-dtext&quot;><p>Removed ip ban 127.0.0.1<br>Ban reason: test</p></div></td>"
+  ],
   "mascot_create": "<td class=&quot;dtext-container&quot;><div class=&quot;styled-dtext&quot;><p>Created mascot #1</p></div></td>",
   "mascot_delete": "<td class=&quot;dtext-container&quot;><div class=&quot;styled-dtext&quot;><p>Deleted mascot #1</p></div></td>",
   "mascot_update": "<td class=&quot;dtext-container&quot;><div class=&quot;styled-dtext&quot;><p>Updated mascot #1</p></div></td>",
