@@ -4,8 +4,9 @@ import { LegacyActions, type ActionTypes } from "./Constants.js";
 import Debug from "./Debug.js";
 import Timer from "./Timer.js";
 import type { ActionMap } from "./types.js";
-import pkg from "../package.json" assert { type: "json" };
 import { JSDOM } from "jsdom";
+import { readFile } from "node:fs/promises";
+const { version } = JSON.parse(await readFile(new URL("../package.json", import.meta.url), "utf8")) as { version: string; };
 
 
 const MakeError = (name: string) => class extends Error {
@@ -81,7 +82,7 @@ export default class E621ModActions {
             baseURL:           options?.baseURL ?? "https://e621.net",
             authUser:          options?.authUser ?? null,
             disableTitleCheck: options?.disableTitleCheck ?? false,
-            userAgent:         options?.userAgent || `E621ModActions/${pkg.version} (+https://github.com/DonovanDMC/E621ModActions${options?.authUser ? `; ${options.authUser}` : ""})`
+            userAgent:         options?.userAgent || `E621ModActions/${version} (+https://github.com/DonovanDMC/E621ModActions${options?.authUser ? `; ${options.authUser}` : ""})`
         };
     }
 
@@ -102,7 +103,7 @@ export default class E621ModActions {
         const auth = this.options.authUser && this.options.authKey ? `Basic ${Buffer.from(`${this.options.authUser}:${this.options.authKey}`).toString("base64")}` : null;
         Debug(`<- GET /mod_actions${qs}`);
         const start = Timer.now();
-        const res = await this.options._fetch(`https://e621.net/mod_actions${qs}`, {
+        const res = await this.options._fetch(`${this.options.baseURL}/mod_actions${qs}`, {
             headers: {
                 "User-Agent": this.options.userAgent,
                 ...(auth ? { Authorization: auth } : {})

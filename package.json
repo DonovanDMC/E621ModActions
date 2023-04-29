@@ -4,7 +4,7 @@
   "description": "A parser for https://e621.net/mod_actions.",
   "main": "dist/lib/index.js",
   "scripts": {
-    "prepublishOnly": "rm -rf dist && tsc -p tsc.json && cp lib/types.d.ts dist/lib",
+    "prepublishOnly": "rm -rf dist && tsc -p tsc.json && cp lib/types.d.ts dist",
     "build": "npm run prepublishOnly",
     "test": "npx mocha",
     "lint": "eslint lib --ext .ts",
@@ -37,16 +37,20 @@
     "@uwu-codes/eslint-config": "^1.1.22",
     "@uwu-codes/tsconfig": "^1.0.7",
     "chai": "^4.3.7",
-    "debug": "^4.3.4",
     "mocha": "^10.2.0",
     "ts-node": "^10.9.1",
     "typescript": "^5.0.2"
   },
   "type": "module",
   "dependencies": {
+    "@json2csv/formatters": "^6.1.3",
+    "@json2csv/node": "^6.1.3",
+    "commander": "^10.0.1",
+    "debug": "^4.3.4",
     "jsdom": "^21.1.1"
   },
   "engines": {
     "node": "^16.15.0 || ^17.5.0 || >=18"
-  }
+  },
+  "bin": "bin/cli.mjs"
 }
