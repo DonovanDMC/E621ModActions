@@ -1,8 +1,7 @@
 import { ActionTypes } from "./Constants.js";
 import type {
     AnyAction,
-    RecordType,
-    SetVisibility,
+    JSONModAction,
     TagStatus,
     UserFlag,
     UserLevel
@@ -16,6 +15,20 @@ function getUser(element: HTMLTableCellElement, index = 0) {
     const id = Number(userElement.href.slice("/users/".length));
     return {
         id:   isNaN(id) ? null as never : id,
+        name: userElement.textContent!
+    };
+}
+
+function getUserName(element: HTMLTableCellElement, id: number) {
+    const userElement = element.querySelector<HTMLAnchorElement>(`a[href^='/users/${id}']`);
+    if (!userElement) {
+        return {
+            id,
+            name: null
+        };
+    }
+    return {
+        id,
         name: userElement.textContent!
     };
 }
@@ -37,672 +50,597 @@ function textReason(r: string, start: string) {
     return r.slice(r.indexOf(start) + start.length + 1);
 }
 
-export default function parse(element: HTMLTableRowElement, useLegacyActions = false): AnyAction {
-    const [dateElement, userElement, messageElement] = element.querySelectorAll("td");
-    const d = dateElement.querySelector("time")?.getAttribute("datetime") ?? null;
-    if (d === null) {
-        console.log(dateElement.innerHTML);
-        throw new Error("Failed to parse row: failed to get date from column 0");
-    }
-    const date = new Date(d);
-    const blame = getUser(userElement);
-    const message = messageElement.textContent!;
+export default function parse(json: JSONModAction, element: HTMLTableRowElement): AnyAction {
+    const [, userElement, messageElement] = element.querySelectorAll("td");
+    const blame = getUserName(userElement, json.creator_id), date = new Date(json.created_at), message = messageElement.textContent!;
+    const data = ParserMap[json.action]?.(message, messageElement);
 
-    if (blame === null) {
-        console.log(userElement.innerHTML);
-        throw new Error("Failed to parse row: failed to get blame from column 1");
+    if (data === undefined) {
+        throw new Error(`Unknown action: ${message} (${messageElement.innerHTML})`);
     }
 
-    let match: RegExpExecArray | null;
+    return {
+        type: json.action,
+        blame,
+        date,
+        id:   json.id,
+        ...(data === null ? {} : data)
+    } as never;
+}
 
-    if ((match = /Deleted pool #(?<id>\d+) \(named (?<name>.+)\) by .+$/.exec(message))) {
-        return {
-            blame,
+export const ParserMap = {
+    [ActionTypes.POOL_DELETE]: (message: string, messageElement: HTMLTableCellElement) => {
+        const match = /^Deleted pool #(?<id>\d+) \(named (?<name>.+)\) by .+$/.exec(message);
+
+        return match === null ? null : {
             user: getUser(messageElement)!,
-            date,
             pool: {
                 id:   Number(match.groups!.id),
-                name: String(match.groups!.name)
-            },
-            type: ActionTypes.POOL_DELETE
+                name: match.groups!.name
+            }
         };
-    }
+    },
+    [ActionTypes.TAKEDOWN_PROCESS]: (message: string) => {
+        const match = /^Completed takedown #(?<id>\d+)$/.exec(message);
 
-    if ((match = /^Completed takedown #(?<id>\d+)$/.exec(message))) {
-        return {
-            blame,
-            date,
+        return match === null ? null : {
             takedown: {
                 id: Number(match.groups!.id)
-            },
-            type: ActionTypes.TAKEDOWN_PROCESS
+            }
         };
-    }
+    },
+    [ActionTypes.TAKEDOWN_DELETE]: (message: string) => {
+        const match = /^Deleted takedown #(?<id>\d+)$/.exec(message);
 
-    if ((match = /^Deleted takedown #(?<id>\d+)$/.exec(message))) {
-        return {
-            blame,
-            date,
+        return match === null ? null : {
             takedown: {
                 id: Number(match.groups!.id)
-            },
-            type: ActionTypes.TAKEDOWN_DELETE
+            }
         };
-    }
+    },
+    [ActionTypes.IP_BAN_CREATE]: (message: string) => {
+        const match = /^Created ip ban(?: (?<ip_address>(?:\d{1,3}\.){3}\d{1,3})\nBan reason: (?<reason>.+))?$/.exec(message);
 
-    // ip address & reason are only shown to admin+
-    if ((match = /^Created ip ban(?: (?<ip_address>(?:\d{1,3}\.){3}\d{1,3})\nBan reason: (?<reason>.+))?$/.exec(message))) {
-        return {
-            blame,
-            date,
+        return match === null ? null : {
             ipAddress: match.groups!.ip_address ?? null,
-            reason:    match.groups!.reason ?? null,
-            type:      ActionTypes.IP_BAN_CREATE
+            reason:    match.groups!.reason ?? null
         };
-    }
+    },
+    [ActionTypes.IP_BAN_DELETE]: (message: string) => {
+        const match = /^Removed ip ban(?: (?<ip_address>(?:\d{1,3}\.){3}\d{1,3})\nBan reason: (?<reason>.+))?$/.exec(message);
 
-    if ((match = /^Removed ip ban(?: (?<ip_address>(?:\d{1,3}\.){3}\d{1,3})\nBan reason: (?<reason>.+))?$/.exec(message))) {
-        return {
-            blame,
-            date,
+        return match === null ? null : {
             ipAddress: match.groups!.ip_address ?? null,
-            reason:    match.groups!.reason ?? null,
-            type:      ActionTypes.IP_BAN_DELETE
+            reason:    match.groups!.reason ?? null
         };
-    }
+    },
+    [ActionTypes.TICKET_UPDATE]: (message: string) => {
+        const match = /^Modified ticket #(?<id>\d+)$/.exec(message);
 
-    if ((match = /^Modified ticket #(?<id>\d+)$/.exec(message))) {
-        return {
-            blame,
-            date,
+        return match === null ? null : {
             ticket: {
                 id: Number(match.groups!.id)
-            },
-            type: ActionTypes.TICKET_UPDATE
+            }
         };
-    }
+    },
+    [ActionTypes.TICKET_CLAIM]: (message: string) => {
+        const match = /^Claimed ticket #(?<id>\d+)$/.exec(message);
 
-    if ((match = /^Claimed ticket #(?<id>\d+)$/.exec(message))) {
-        return {
-            blame,
-            date,
+        return match === null ? null : {
             ticket: {
                 id: Number(match.groups!.id)
-            },
-            type: ActionTypes.TICKET_CLAIM
+            }
         };
-    }
+    },
+    [ActionTypes.TICKET_UNCLAIM]: (message: string) => {
+        const match = /^Unclaimed ticket #(?<id>\d+)$/.exec(message);
 
-    if ((match = /^Unclaimed ticket #(?<id>\d+)$/.exec(message))) {
-        return {
-            blame,
-            date,
+        return match === null ? null : {
             ticket: {
                 id: Number(match.groups!.id)
-            },
-            type: ActionTypes.TICKET_UNCLAIM
+            }
         };
-    }
+    },
+    [ActionTypes.ARTIST_PAGE_RENAME]: (message: string) => {
+        const match = /^Renamed artist page \((?<old>.+) -> (?<new>.+)\)$/.exec(message);
 
-    if ((match = /^Renamed artist page \((?<old>.+) -> (?<new>.+)\)$/.exec(message))) {
-        return {
-            blame,
-            date,
+        return match === null ? null : {
             oldName: String(match.groups!.old),
-            newName: String(match.groups!.new),
-            type:    ActionTypes.ARTIST_PAGE_RENAME
+            newName: String(match.groups!.new)
         };
-    }
+    },
+    [ActionTypes.ARTIST_PAGE_LOCK]: (message: string) => {
+        const match = /^Locked artist page artist #(?<id>\d+)$/.exec(message);
 
-    if ((match = /^Locked artist page artist #(?<id>\d+)$/.exec(message))) {
-        return {
-            blame,
-            date,
+        return match === null ? null : {
+            artist: {
+                id: Number(match.groups!.id)
+            }
+        };
+    },
+    [ActionTypes.ARTIST_PAGE_UNLOCK]: (message: string) => {
+        const match = /^Unlocked artist page artist #(?<id>\d+)$/.exec(message);
+
+        return match === null ? null : {
+            artist: {
+                id: Number(match.groups!.id)
+            }
+        };
+    },
+    [ActionTypes.ARTIST_USER_LINKED]: (message: string, messageElement: HTMLTableCellElement) => {
+        const match = /^Linked .+ to artist #(?<id>\d+)$/.exec(message);
+
+        return match === null ? null : {
             artist: {
                 id: Number(match.groups!.id)
             },
-            type: ActionTypes.ARTIST_PAGE_LOCK
+            user: getUser(messageElement)!
         };
-    }
+    },
+    [ActionTypes.ARTIST_USER_UNLINKED]: (message: string, messageElement: HTMLTableCellElement) => {
+        const match = /^Unlinked (?:.+)? from artist #(?<id>\d+)$/.exec(message);
 
-    if ((match = /^Unlocked artist page artist #(?<id>\d+)$/.exec(message))) {
-        return {
-            blame,
-            date,
+        return match === null ? null : {
             artist: {
                 id: Number(match.groups!.id)
             },
-            type: ActionTypes.ARTIST_PAGE_UNLOCK
+            user: getUser(messageElement)
         };
-    }
-
-    if ((match = /^Linked .+ to artist #(?<id>\d+)$/.exec(message))) {
-        const user = getUser(messageElement)!;
-        return {
-            blame,
-            date,
-            artist: {
-                id: Number(match.groups!.id)
-            },
-            user,
-            type: ActionTypes.ARTIST_USER_LINKED
-        };
-    }
-
-    // user can be missing
-    if ((match = /^Unlinked (?:.+)? from artist #(?<id>\d+)$/.exec(message))) {
-        const user = getUser(messageElement)!;
-        return {
-            blame,
-            date,
-            artist: {
-                id: Number(match.groups!.id)
-            },
-            user,
-            type: ActionTypes.ARTIST_USER_UNLINKED
-        };
-    }
-
-    if ((match = /^Deleted user .+$/.exec(message))) {
-        return {
-            blame,
-            date,
-            user: getUser(messageElement)!,
-            type: ActionTypes.USER_DELETE
-        };
-    }
-
-    if (message.startsWith("Banned ")) {
+    },
+    [ActionTypes.USER_DELETE]: (message: string, messageElement: HTMLTableCellElement) => ({
+        user: getUser(messageElement)!
+    }),
+    [ActionTypes.USER_BAN]: (message: string, messageElement: HTMLTableCellElement) => {
+        let match: RegExpExecArray | null;
         if (/^Banned .+ permanently$/.test(message)) {
             return {
-                blame,
-                date,
                 duration: null,
-                user:     getUser(messageElement)!,
-                type:     ActionTypes.USER_BAN
+                user:     getUser(messageElement)!
             };
         } else if ((match = /^Banned .+ for (?<days>\d+) days?$/.exec(message))) {
             return {
-                blame,
-                date,
                 duration: Number(match.groups!.days),
-                user:     getUser(messageElement)!,
-                type:     ActionTypes.USER_BAN
+                user:     getUser(messageElement)!
             };
         } else {
             return {
-                blame,
-                date,
                 duration: undefined,
-                user:     getUser(messageElement)!,
-                type:     ActionTypes.USER_BAN
+                user:     getUser(messageElement)!
             };
         }
-    }
+    },
+    [ActionTypes.USER_UNBAN]: (message: string, messageElement: HTMLTableCellElement) => ({
+        user: getUser(messageElement)!
+    }),
+    [ActionTypes.USER_LEVEL_CHANGE]: (message: string, messageElement: HTMLTableCellElement) => {
+        const match = /^Changed .+ level from (?<old>.+) to (?<new>.+)$/.exec(message);
 
-    if ((match = /^Unbanned .+$/.exec(message))) {
-        return {
-            blame,
-            date,
-            user: getUser(messageElement)!,
-            type: ActionTypes.USER_UNBAN
-        };
-    }
-
-    if ((match = /^Changed .+ level from (?<old>.+) to (?<new>.+)$/.exec(message))) {
-        return {
-            blame,
-            date,
+        return match === null ? null : {
             oldLevel: String(match.groups!.old) as UserLevel,
             newLevel: String(match.groups!.new) as UserLevel,
-            user:     getUser(messageElement)!,
-            type:     ActionTypes.USER_LEVEL_CHANGE
+            user:     getUser(messageElement)!
         };
-    }
+    },
+    [ActionTypes.USER_FLAGS_CHANGE]: (message: string, messageElement: HTMLTableCellElement) => {
+        const match = /^Changed .+ flags. Added: \[(?<added>.*)] Removed: \[(?<removed>.*)]$/.exec(message);
 
-    if ((match = /^Changed .+ flags. Added: \[(?<added>.*)] Removed: \[(?<removed>.*)]$/.exec(message))) {
-        return {
-            blame,
-            date,
+        return match === null ? null : {
             addedFlags:   String(match.groups!.added).split(", ").filter(Boolean) as Array<UserFlag>,
             removedFlags: String(match.groups!.removed).split(", ").filter(Boolean) as Array<UserFlag>,
-            user:         getUser(messageElement)!,
-            type:         ActionTypes.USER_FLAGS_CHANGE
+            user:         getUser(messageElement)!
         };
-    }
+    },
+    [ActionTypes.EDITED_USER]: (message: string, messageElement: HTMLTableCellElement) => ({
+        user: getUser(messageElement)!
+    }),
+    [ActionTypes.USER_BLACKLIST_CHANGED]: (message: string, messageElement: HTMLTableCellElement) => ({
+        user: getUser(messageElement)!
+    }),
+    [ActionTypes.USER_TEXT_CHANGE]: (message: string, messageElement: HTMLTableCellElement) => ({
+        user: getUser(messageElement)!
+    }),
+    [ActionTypes.CHANGED_USER_TEXT]: (message: string, messageElement: HTMLTableCellElement) => ({
+        user: getUser(messageElement)!
+    }),
+    [ActionTypes.USER_UPLOAD_LIMIT_CHANGE]: (message: string, messageElement: HTMLTableCellElement) => {
+        const match = /^Changed upload limit of .+ from (?<old>-?.+) to (?<new>-?.+)$/.exec(message);
 
-    editedUser: if ((match = /^Edited (?<name>.+)$/.exec(message))) {
-        const user = getUser(messageElement)! as unknown as { id: null; name: string; } | null;
-        // since this action is so vage, we make sure we're getting the right info
-        if (user?.name !== String(match.groups!.name)) {
-            break editedUser;
-        }
-        return {
-            blame,
-            date,
-            user,
-            type: ActionTypes.EDITED_USER
-        };
-    }
-
-    if ((match = /^Edited blacklist of .+$/.exec(message))) {
-        return {
-            blame,
-            date,
-            user: getUser(messageElement)!,
-            type: ActionTypes.USER_BLACKLIST_CHANGED
-        };
-    }
-
-    // internally, changed_user_text & user_text_change are distinct, but we have no way to differentiate them
-    if ((match = /^Changed profile text of .+$/.exec(message))) {
-        return {
-            blame,
-            date,
-            user: getUser(messageElement)!,
-            type: useLegacyActions ? ActionTypes.CHANGED_USER_TEXT : ActionTypes.USER_TEXT_CHANGE
-        };
-    }
-
-    if ((match = /^Changed upload limit of .+ from (?<old>-?.+) to (?<new>-?.+)$/.exec(message))) {
-        return {
-            blame,
-            date,
+        return match === null ? null : {
             oldLimit: Number(match.groups!.old),
             newLimit: Number(match.groups!.new),
-            user:     getUser(messageElement)!,
-            type:     ActionTypes.USER_UPLOAD_LIMIT_CHANGE
+            user:     getUser(messageElement)!
         };
-    }
+    },
+    [ActionTypes.USER_NAME_CHANGE]: (message: string, messageElement: HTMLTableCellElement) => ({
+        user: getUser(messageElement)!
+    }),
+    [ActionTypes.USER_FEEDBACK_CREATE]: (message: string, messageElement: HTMLTableCellElement) => {
+        const match = /^created (?<type>negative|neutral|positive) record #(?<id>\d+) for .+ with reason:/i.exec(message);
 
-    if ((match = /^Changed name of .+ from (?<old>.+) to (?<new>.+)$/.exec(message))) {
-        return {
-            blame,
-            date,
-            oldName: String(match.groups!.old),
-            newName: String(match.groups!.new),
-            user:    getUser(messageElement)!,
-            type:    ActionTypes.USER_NAME_CHANGE
-        };
-    }
-
-    if ((match = /^Created (?<type>[Nn](?:egative|eutral)|[Pp]ositive) record #(?<id>\d+) for .+ with reason:/.exec(message))) {
-        const type = match.groups!.type;
-        return {
-            blame,
-            date,
+        return match === null ? null : {
             record: {
                 id:         Number(match.groups!.id),
-                type:       type.toLowerCase() as never,
+                type:       match.groups!.type.toLowerCase(),
                 htmlReason: htmlReason(messageElement.innerHTML, "with reason:"),
                 textReason: textReason(messageElement.textContent!, "with reason:")
             },
-            user: getUser(messageElement)!,
-            type: useLegacyActions && type.charAt(0) !== type.charAt(0).toUpperCase() ?
-                (type === "negative" ? ActionTypes.CREATED_NEGATIVE_RECORD :
-                // eslint-disable-next-line unicorn/no-nested-ternary
-                    (type === "neutral" ? ActionTypes.CREATED_NEUTRAL_RECORD :
-                        (type === "positive" ? ActionTypes.CREATED_POSITIVE_RECORD :
-                            ActionTypes.USER_FEEDBACK_CREATE))) : ActionTypes.USER_FEEDBACK_CREATE
+            user: getUser(messageElement)!
         };
-    }
+    },
+    [ActionTypes.USER_FEEDBACK_UPDATE]: (message: string, messageElement: HTMLTableCellElement) => {
+        let match: RegExpExecArray | null;
+        // legacy
+        if ((match = /^Edited (?<type>negative|neutral|positive) record #(?<id>\d+) for .+ to:/.exec(message))) {
+            return {
+                record: {
+                    id:         Number(match.groups!.id),
+                    type:       match.groups!.type.toLowerCase(),
+                    htmlReason: htmlReason(messageElement.innerHTML, "to:"),
+                    textReason: textReason(messageElement.textContent!, "to:")
+                },
+                user: getUser(messageElement)!
+            };
+        } else if ((match = /^Edited record #(?<id>\d+) for .+/.exec(message))) {
+            const typeMatch = /Changed type from (?<old>negative|neutral|positive) to (?<new>negative|neutral|positive)/.exec(message);
+            const reasonMatch = /Changed reason: \[section=Old](?<old>.+)\[\/section] \[section=New](?<new>.+)\[\/section]/.exec(message);
 
-    if ((match = /^Edited (?<type>n(?:egative|eutral)|positive) record #(?<id>\d+) for .+ to:/.exec(message))) {
-        return {
-            blame,
-            date,
+            const data = {
+                record: {
+                    id: Number(match.groups!.id)
+                },
+                user: getUser(messageElement)!
+            };
+
+            if (typeMatch) {
+                Object.assign(data.record, {
+                    oldType: typeMatch.groups!.old,
+                    newType: typeMatch.groups!.new
+                });
+            }
+
+            if (reasonMatch) {
+                Object.assign(data.record, {
+                    oldReason: reasonMatch.groups!.old,
+                    newReason: reasonMatch.groups!.new
+                });
+            }
+
+            return data;
+        } else {
+            return null;
+        }
+    },
+    [ActionTypes.USER_FEEDBACK_DELETE]: (message: string, messageElement: HTMLTableCellElement) => {
+        const match = /^Deleted (?<type>negative|neutral|positive) record #(?<id>\d+) for .+ with reason:/.exec(message);
+
+        return match === null ? null : {
             record: {
                 id:         Number(match.groups!.id),
-                type:       match.groups!.type as RecordType,
-                htmlReason: htmlReason(messageElement.innerHTML, "to:"),
-                textReason: textReason(messageElement.textContent!, "to:")
-            },
-            user: getUser(messageElement)!,
-            type: ActionTypes.USER_FEEDBACK_UPDATE
-        };
-    }
-
-    if ((match = /^Deleted (?<type>n(?:egative|eutral)|positive) record #(?<id>\d+) for .+ with reason:/.exec(message))) {
-        return {
-            blame,
-            date,
-            record: {
-                id:         Number(match.groups!.id),
-                type:       match.groups!.type as RecordType,
+                type:       match.groups!.type,
                 htmlReason: htmlReason(messageElement.innerHTML, "with reason:"),
                 textReason: textReason(messageElement.textContent!, "with reason:")
             },
-            user: getUser(messageElement)!,
-            type: ActionTypes.USER_FEEDBACK_DELETE
+            user: getUser(messageElement)!
         };
-    }
+    },
+    [ActionTypes.CREATED_POSITIVE_RECORD]: (message: string, messageElement: HTMLTableCellElement) => {
+        const match = /^Created positive record #(?<id>\d+) for .+ with reason:/.exec(message);
 
-    if ((match = /^Made set #(?<id>\d+) by .+ (?<visibility>public|private)/.exec(message))) {
-        return {
-            blame,
-            date,
+        return match === null ? null : {
+            record: {
+                id:         Number(match.groups!.id),
+                type:       "positive",
+                htmlReason: htmlReason(messageElement.innerHTML, "with reason:"),
+                textReason: textReason(messageElement.textContent!, "with reason:")
+            },
+            user: getUser(messageElement)!
+        };
+    },
+    [ActionTypes.CREATED_NEUTRAL_RECORD]: (message: string, messageElement: HTMLTableCellElement) => {
+        const match = /^Created neutral record #(?<id>\d+) for .+ with reason:/.exec(message);
+
+        return match === null ? null : {
+            record: {
+                id:         Number(match.groups!.id),
+                type:       "neutral",
+                htmlReason: htmlReason(messageElement.innerHTML, "with reason:"),
+                textReason: textReason(messageElement.textContent!, "with reason:")
+            },
+            user: getUser(messageElement)!
+        };
+    },
+    [ActionTypes.CREATED_NEGATIVE_RECORD]: (message: string, messageElement: HTMLTableCellElement) => {
+        const match = /^Created negative record #(?<id>\d+) for .+ with reason:/.exec(message);
+
+        return match === null ? null : {
+            record: {
+                id:         Number(match.groups!.id),
+                type:       "negative",
+                htmlReason: htmlReason(messageElement.innerHTML, "with reason:"),
+                textReason: textReason(messageElement.textContent!, "with reason:")
+            },
+            user: getUser(messageElement)!
+        };
+    },
+    [ActionTypes.SET_CHANGE_VISIBILITY]: (message: string, messageElement: HTMLTableCellElement) => {
+        const match = /^Made set #(?<id>\d+) by .+ (?<visibility>public|private)$/.exec(message);
+
+        return match === null ? null : {
             set: {
                 id: Number(match.groups!.id)
             },
-            visibility: match.groups!.visibility as SetVisibility,
-            user:       getUser(messageElement)!,
-            type:       ActionTypes.SET_CHANGE_VISIBILITY
+            visibility: match.groups!.visibility,
+            user:       getUser(messageElement)!
         };
-    }
+    },
+    [ActionTypes.SET_UPDATE]: (message: string, messageElement: HTMLTableCellElement) => {
+        const match = /^Edited set #(?<id>\d+) by .+$/.exec(message);
 
-    if ((match = /^Edited set #(?<id>\d+) by .+/.exec(message))) {
-        return {
-            blame,
-            date,
+        return match === null ? null : {
             set: {
                 id: Number(match.groups!.id)
             },
-            user: getUser(messageElement)!,
-            type: ActionTypes.SET_UPDATE
+            user: getUser(messageElement)!
         };
-    }
+    },
+    [ActionTypes.SET_DELETE]: (message: string, messageElement: HTMLTableCellElement) => {
+        const match = /^Deleted set #(?<id>\d+) by .+$/.exec(message);
 
-    if ((match = /^Deleted set #(?<id>\d+) by .+/.exec(message))) {
-        return {
-            blame,
-            date,
+        return match === null ? null : {
             set: {
                 id: Number(match.groups!.id)
             },
-            user: getUser(messageElement)!,
-            type: ActionTypes.SET_DELETE
+            user: getUser(messageElement)!
         };
-    }
+    },
+    [ActionTypes.COMMENT_UPDATE]: (message: string, messageElement: HTMLTableCellElement) => {
+        const match = /^Edited comment #(?<id>\d+) by .+$/.exec(message);
 
-    if ((match = /^Edited comment #(?<id>\d+) by .+/.exec(message))) {
-        return {
-            blame,
-            date,
+        return match === null ? null : {
             comment: {
                 id: Number(match.groups!.id)
             },
-            user: getUser(messageElement)!,
-            type: ActionTypes.COMMENT_UPDATE
+            user: getUser(messageElement)!
         };
-    }
+    },
+    [ActionTypes.COMMENT_DELETE]: (message: string, messageElement: HTMLTableCellElement) => {
+        const match = /^Deleted comment #(?<id>\d+) by .+$/.exec(message);
 
-    if ((match = /^Deleted comment #(?<id>\d+) by .+/.exec(message))) {
-        return {
-            blame,
-            date,
+        return match === null ? null : {
             comment: {
                 id: Number(match.groups!.id)
             },
-            user: getUser(messageElement)!,
-            type: ActionTypes.COMMENT_DELETE
+            user: getUser(messageElement)!
         };
-    }
+    },
+    [ActionTypes.COMMENT_HIDE]: (message: string, messageElement: HTMLTableCellElement) => {
+        const match = /^Hid comment #(?<id>\d+) by .+$/.exec(message);
 
-    if ((match = /^Hid comment #(?<id>\d+) by .+/.exec(message))) {
-        return {
-            blame,
-            date,
+        return match === null ? null : {
             comment: {
                 id: Number(match.groups!.id)
             },
-            user: getUser(messageElement)!,
-            type: ActionTypes.COMMENT_HIDE
+            user: getUser(messageElement)!
         };
-    }
+    },
+    [ActionTypes.COMMENT_UNHIDE]: (message: string, messageElement: HTMLTableCellElement) => {
+        const match = /^Unhid comment #(?<id>\d+) by .+$/.exec(message);
 
-    if ((match = /^Unhid comment #(?<id>\d+) by .+/.exec(message))) {
-        return {
-            blame,
-            date,
+        return match === null ? null : {
             comment: {
                 id: Number(match.groups!.id)
             },
-            user: getUser(messageElement)!,
-            type: ActionTypes.COMMENT_UNHIDE
+            user: getUser(messageElement)!
         };
-    }
+    },
+    [ActionTypes.FORUM_POST_DELETE]: (message: string, messageElement: HTMLTableCellElement) => {
+        const match = /^Deleted forum #(?<id>\d+) in topic #(?<topic_id>\d+) by .+$/.exec(message);
 
-    if ((match = /^Deleted forum #(?<id>\d+) in topic #(?<topic_id>\d+) by .+/.exec(message))) {
-        return {
-            blame,
-            date,
+        return match === null ? null : {
             forumPost: {
                 id:    Number(match.groups!.id),
                 topic: Number(match.groups!.topic_id)
             },
-            user: getUser(messageElement)!,
-            type: ActionTypes.FORUM_POST_DELETE
+            user: getUser(messageElement)!
         };
-    }
+    },
+    [ActionTypes.FORUM_POST_UPDATE]: (message: string, messageElement: HTMLTableCellElement) => {
+        const match = /^Edited forum #(?<id>\d+) in topic #(?<topic_id>\d+) by .+$/.exec(message);
 
-    if ((match = /^Edited forum #(?<id>\d+) in topic #(?<topic_id>\d+) by .+/.exec(message))) {
-        return {
-            blame,
-            date,
+        return match === null ? null : {
             forumPost: {
                 id:    Number(match.groups!.id),
                 topic: Number(match.groups!.topic_id)
             },
-            user: getUser(messageElement)!,
-            type: ActionTypes.FORUM_POST_UPDATE
+            user: getUser(messageElement)!
         };
-    }
+    },
+    [ActionTypes.FORUM_POST_HIDE]: (message: string, messageElement: HTMLTableCellElement) => {
+        const match = /^Hid forum #(?<id>\d+) in topic #(?<topic_id>\d+) by .+$/.exec(message);
 
-    if ((match = /^Hid forum #(?<id>\d+) in topic #(?<topic_id>\d+) by .+/.exec(message))) {
-        return {
-            blame,
-            date,
+        return match === null ? null : {
             forumPost: {
                 id:    Number(match.groups!.id),
                 topic: Number(match.groups!.topic_id)
             },
-            user: getUser(messageElement)!,
-            type: ActionTypes.FORUM_POST_HIDE
+            user: getUser(messageElement)!
         };
-    }
+    },
+    [ActionTypes.FORUM_POST_UNHIDE]: (message: string, messageElement: HTMLTableCellElement) => {
+        const match = /^Unhid forum #(?<id>\d+) in topic #(?<topic_id>\d+) by .+$/.exec(message);
 
-    if ((match = /^Unhid forum #(?<id>\d+) in topic #(?<topic_id>\d+) by .+/.exec(message))) {
-        return {
-            blame,
-            date,
+        return match === null ? null : {
             forumPost: {
                 id:    Number(match.groups!.id),
                 topic: Number(match.groups!.topic_id)
             },
-            user: getUser(messageElement)!,
-            type: ActionTypes.FORUM_POST_UNHIDE
+            user: getUser(messageElement)!
         };
-    }
+    },
+    [ActionTypes.FORUM_TOPIC_HIDE]: (message: string, messageElement: HTMLTableCellElement) => {
+        const match = /^Hid topic #(?<id>\d+) \(with title (?<title>.+)\) by .+$/.exec(message);
 
-    if ((match = /^Hid topic #(?<id>\d+) \(with title (?<title>.+)\) by .+$/.exec(message))) {
-        return {
-            blame,
-            date,
+        return match === null ? null : {
             forumTopic: {
                 id:    Number(match.groups!.id),
                 title: match.groups!.title
             },
-            user: getUser(messageElement)!,
-            type: ActionTypes.FORUM_TOPIC_HIDE
+            user: getUser(messageElement)!
         };
-    }
+    },
+    [ActionTypes.FORUM_TOPIC_UNHIDE]: (message: string, messageElement: HTMLTableCellElement) => {
+        const match = /^Unhid topic #(?<id>\d+) \(with title (?<title>.+)\) by .+$/.exec(message);
 
-    if ((match = /^Unhid topic #(?<id>\d+) \(with title (?<title>.+)\) by .+$/.exec(message))) {
-        return {
-            blame,
-            date,
+        return match === null ? null : {
             forumTopic: {
                 id:    Number(match.groups!.id),
                 title: match.groups!.title
             },
-            user: getUser(messageElement)!,
-            type: ActionTypes.FORUM_TOPIC_UNHIDE
+            user: getUser(messageElement)!
         };
-    }
+    },
+    [ActionTypes.FORUM_TOPIC_DELETE]: (message: string, messageElement: HTMLTableCellElement) => {
+        const match = /^Deleted topic #(?<id>\d+) \(with title (?<title>.+)\) by .+$/.exec(message);
 
-    if ((match = /^Deleted topic #(?<id>\d+) \(with title (?<title>.+)\) by .+$/.exec(message))) {
-        return {
-            blame,
-            date,
+        return match === null ? null : {
             forumTopic: {
                 id:    Number(match.groups!.id),
                 title: match.groups!.title
             },
-            user: getUser(messageElement)!,
-            type: ActionTypes.FORUM_TOPIC_DELETE
+            user: getUser(messageElement)!
         };
-    }
+    },
+    [ActionTypes.FORUM_TOPIC_STICK]: (message: string, messageElement: HTMLTableCellElement) => {
+        const match = /^Stickied topic #(?<id>\d+) \(with title (?<title>.+)\) by .+$/.exec(message);
 
-    if ((match = /^Stickied topic #(?<id>\d+) \(with title (?<title>.+)\) by .+$/.exec(message))) {
-        return {
-            blame,
-            date,
+        return match === null ? null : {
             forumTopic: {
                 id:    Number(match.groups!.id),
                 title: match.groups!.title
             },
-            user: getUser(messageElement)!,
-            type: ActionTypes.FORUM_TOPIC_STICK
+            user: getUser(messageElement)!
         };
-    }
+    },
+    [ActionTypes.FORUM_TOPIC_UNSTICK]: (message: string, messageElement: HTMLTableCellElement) => {
+        const match = /^Unstickied topic #(?<id>\d+) \(with title (?<title>.+)\) by .+$/.exec(message);
 
-    if ((match = /^Unstickied topic #(?<id>\d+) \(with title (?<title>.+)\) by .+$/.exec(message))) {
-        return {
-            blame,
-            date,
+        return match === null ? null : {
             forumTopic: {
                 id:    Number(match.groups!.id),
                 title: match.groups!.title
             },
-            user: getUser(messageElement)!,
-            type: ActionTypes.FORUM_TOPIC_UNSTICK
+            user: getUser(messageElement)!
         };
-    }
+    },
+    [ActionTypes.FORUM_TOPIC_LOCK]: (message: string, messageElement: HTMLTableCellElement) => {
+        const match = /^Locked topic #(?<id>\d+) \(with title (?<title>.+)\) by .+$/.exec(message);
 
-    if ((match = /^Locked topic #(?<id>\d+) \(with title (?<title>.+)\) by .+$/.exec(message))) {
-        return {
-            blame,
-            date,
+        return match === null ? null : {
             forumTopic: {
                 id:    Number(match.groups!.id),
                 title: match.groups!.title
             },
-            user: getUser(messageElement)!,
-            type: ActionTypes.FORUM_TOPIC_LOCK
+            user: getUser(messageElement)!
         };
-    }
+    },
+    [ActionTypes.FORUM_TOPIC_UNLOCK]: (message: string, messageElement: HTMLTableCellElement) => {
+        const match = /^Unlocked topic #(?<id>\d+) \(with title (?<title>.+)\) by .+$/.exec(message);
 
-    if ((match = /^Unlocked topic #(?<id>\d+) \(with title (?<title>.+)\) by .+$/.exec(message))) {
-        return {
-            blame,
-            date,
+        return match === null ? null : {
             forumTopic: {
                 id:    Number(match.groups!.id),
                 title: match.groups!.title
             },
-            user: getUser(messageElement)!,
-            type: ActionTypes.FORUM_TOPIC_UNLOCK
+            user: getUser(messageElement)!
         };
-    }
+    },
+    [ActionTypes.FORUM_CATEGORY_CREATE]: (message: string) => {
+        const match = /^Created forum category #(?<id>\d+)$/.exec(message);
 
-    if ((match = /^Created forum category #(?<id>\d+)$/.exec(message))) {
-        return {
-            blame,
-            date,
+        return match === null ? null : {
             forumCategory: {
                 id: Number(match.groups!.id)
-            },
-            type: ActionTypes.FORUM_CATEGORY_CREATE
+            }
         };
-    }
+    },
+    [ActionTypes.FORUM_CATEGORY_UPDATE]: (message: string) => {
+        const match = /^Edited forum category #(?<id>\d+)$/.exec(message);
 
-    if ((match = /^Edited forum category #(?<id>\d+)$/.exec(message))) {
-        return {
-            blame,
-            date,
+        return match === null ? null : {
             forumCategory: {
                 id: Number(match.groups!.id)
-            },
-            type: ActionTypes.FORUM_CATEGORY_UPDATE
+            }
         };
-    }
+    },
+    [ActionTypes.FORUM_CATEGORY_DELETE]: (message: string) => {
+        const match = /^Deleted forum category #(?<id>\d+)$/.exec(message);
 
-    if ((match = /^Deleted forum category #(?<id>\d+)$/.exec(message))) {
-        return {
-            blame,
-            date,
+        return match === null ? null : {
             forumCategory: {
                 id: Number(match.groups!.id)
-            },
-            type: ActionTypes.FORUM_CATEGORY_DELETE
+            }
         };
-    }
+    },
+    [ActionTypes.BLIP_UPDATE]: (message: string, messageElement: HTMLTableCellElement) => {
+        const match = /^Edited blip #(?<id>\d+) by .+$/.exec(message);
 
-    if ((match = /^Edited blip #(?<id>\d+) by .+$/.exec(message))) {
-        return {
-            blame,
-            date,
+        return match === null ? null : {
             blip: {
                 id: Number(match.groups!.id)
             },
-            user: getUser(messageElement)!,
-            type: ActionTypes.BLIP_UPDATE
+            user: getUser(messageElement)!
         };
-    }
+    },
+    [ActionTypes.BLIP_DELETE]: (message: string, messageElement: HTMLTableCellElement) => {
+        const match = /^Deleted blip #(?<id>\d+)(?: by .+)?$/.exec(message);
 
-    if ((match = /^Deleted blip #(?<id>\d+)(?: by .+)?$/.exec(message))) {
-        return {
-            blame,
-            date,
+        return match === null ? null : {
             blip: {
                 id: Number(match.groups!.id)
             },
-            user: getUser(messageElement) as unknown as { id: null; name: string; } | null,
-            type: ActionTypes.BLIP_DELETE
+            user: getUser(messageElement)
         };
-    }
+    },
+    [ActionTypes.BLIP_HIDE]: (message: string, messageElement: HTMLTableCellElement) => {
+        const match = /^Hid blip #(?<id>\d+)(?: by .+)?$/.exec(message);
 
-    if ((match = /^Hid blip #(?<id>\d+)(?: by .+)?$/.exec(message))) {
-        return {
-            blame,
-            date,
+        return match === null ? null : {
             blip: {
                 id: Number(match.groups!.id)
             },
-            user: getUser(messageElement) as unknown as { id: null; name: string; } | null,
-            type: ActionTypes.BLIP_HIDE
+            user: getUser(messageElement)
         };
-    }
+    },
+    [ActionTypes.BLIP_UNHIDE]: (message: string, messageElement: HTMLTableCellElement) => {
+        const match = /^Unhid blip #(?<id>\d+)(?: by .+)?$/.exec(message);
 
-    if ((match = /^Unhid blip #(?<id>\d+) by .+?$/.exec(message))) {
-        return {
-            blame,
-            date,
+        return match === null ? null : {
             blip: {
                 id: Number(match.groups!.id)
             },
-            user: getUser(messageElement)!,
-            type: ActionTypes.BLIP_UNHIDE
+            user: getUser(messageElement)
         };
-    }
-
+    },
     // This technically has a variable structure, but I can't see anywhere where it's actually different
-    if ((match = /^Created(?: tag alias){2} #(?<id>\d+): (?<antecedent>.+) -> (?<consequent>.+)$/.exec(message))) {
-        return {
-            blame,
-            date,
+    [ActionTypes.TAG_ALIAS_CREATE]: (message: string) => {
+        const match = /^Created(?: tag alias){2} #(?<id>\d+): (?<antecedent>.+) -> (?<consequent>.+)$/.exec(message);
+
+        return match === null ? null : {
             tagAlias: {
                 antecedent: match.groups!.antecedent,
                 consequent: match.groups!.consequent,
                 id:         Number(match.groups!.id)
-            },
-            type: ActionTypes.TAG_ALIAS_CREATE
+            }
         };
-    }
-
+    },
     // tag_alias_approve & tag_alias_delete should be here, but as far as I can tell they aren't actually used anywhere
+    [ActionTypes.TAG_ALIAS_UPDATE]: (message: string) => {
+        const match = /^Updated(?: tag alias){2} #(?<id>\d+): (?<antecedent>.+) -> (?<consequent>.+)/.exec(message);
 
-    if (((match = /^Updated(?: tag alias){2} #(?<id>\d+): (?<antecedent>.+) -> (?<consequent>.+)/.exec(message)))) {
+        if (match === null) {
+            return null;
+        }
+
         const changes = message.split("\n")[1]?.split(", ") ?? [];
         const updates: {
             antecedentName?: {
@@ -773,38 +711,47 @@ export default function parse(element: HTMLTableRowElement, useLegacyActions = f
                 };
                 continue;
             }
+
+            return {
+                tagAlias: {
+                    antecedent: match.groups!.antecedent,
+                    consequent: match.groups!.consequent,
+                    id:         Number(match.groups!.id),
+                    updates
+                }
+            };
         }
+
         return {
-            blame,
-            date,
             tagAlias: {
                 antecedent: match.groups!.antecedent,
                 consequent: match.groups!.consequent,
                 id:         Number(match.groups!.id),
                 updates
-            },
-            type: ActionTypes.TAG_ALIAS_UPDATE
+            }
         };
-    }
-
+    },
     // This technically has a variable structure, but I can't see anywhere where it's actually different
-    if ((match = /^Created(?: tag implication){2} #(?<id>\d+): (?<antecedent>.+) -> (?<consequent>.+)$/.exec(message))) {
-        return {
-            blame,
-            date,
+    [ActionTypes.TAG_IMPLICATION_CREATE]: (message: string) => {
+        const match = /^Created(?: tag implication){2} #(?<id>\d+): (?<antecedent>.+) -> (?<consequent>.+)$/.exec(message);
+
+        return match === null ? null : {
             tagImplication: {
-                id:         Number(match.groups!.id),
                 antecedent: match.groups!.antecedent,
-                consequent: match.groups!.consequent
-            },
-            type: ActionTypes.TAG_IMPLICATION_CREATE
+                consequent: match.groups!.consequent,
+                id:         Number(match.groups!.id)
+            }
         };
-    }
-
+    },
     // tag_implication_approve & tag_implication_delete should be here, but as far as I can tell they aren't actually used anywhere
+    [ActionTypes.TAG_IMPLICATION_UPDATE]: (message: string) => {
+        const match = /^Updated(?: tag implication){2} #(?<id>\d+): (?<antecedent>.+) -> (?<consequent>.+)/.exec(message);
+
+        if (match === null) {
+            return null;
+        }
 
 
-    if (((match = /^Updated(?: tag implication){2} #(?<id>\d+): (?<antecedent>.+) -> (?<consequent>.+)/.exec(message)))) {
         const changes = message.split("\n")[1]?.split(", ") ?? [];
         const updates: {
             antecedentName?: {
@@ -866,383 +813,308 @@ export default function parse(element: HTMLTableRowElement, useLegacyActions = f
                 continue;
             }
         }
+
         return {
-            blame,
-            date,
             tagImplication: {
                 antecedent: match.groups!.antecedent,
                 consequent: match.groups!.consequent,
                 id:         Number(match.groups!.id),
                 updates
-            },
-            type: ActionTypes.TAG_IMPLICATION_UPDATE
+            }
         };
-    }
+    },
+    [ActionTypes.CREATED_FLAG_REASON]: (message: string) => {
+        const match = /^Created flag reason #(?<id>\d+) \((?<reason>.+)\)$/.exec(message);
 
-    if ((match = /^Created flag reason #(?<id>\d+) \((?<reason>.+)\)$/.exec(message))) {
-        return {
-            blame,
-            date,
+        return match === null ? null : {
             flagReason: {
                 id:     Number(match.groups!.id),
                 reason: match.groups!.reason
-            },
-            type: ActionTypes.CREATED_FLAG_REASON
+            }
         };
-    }
+    },
+    [ActionTypes.EDITED_FLAG_REASON]: (message: string) => {
+        const match = /^Edited flag reason #(?<id>\d+) \((?<reason>.+)\)$/.exec(message);
 
-    if ((match = /^Edited flag reason #(?<id>\d+) \((?<reason>.+)\)/.exec(message))) {
-        return {
-            blame,
-            date,
+        return match === null ? null : {
             flagReason: {
                 id:     Number(match.groups!.id),
                 reason: match.groups!.reason
-            },
-            type: ActionTypes.EDITED_FLAG_REASON
+            }
         };
-    }
+    },
+    [ActionTypes.DELETED_FLAG_REASON]: (message: string) => {
+        const match = /^Deleted flag reason #(?<id>\d+) \((?<reason>.+)\)$/.exec(message);
 
-    if ((match = /^Deleted flag reason #(?<id>\d+) \((?<reason>.+)\)$/.exec(message))) {
-        return {
-            blame,
-            date,
+        return match === null ? null : {
             flagReason: {
                 id:     Number(match.groups!.id),
                 reason: match.groups!.reason
-            },
-            type: ActionTypes.DELETED_FLAG_REASON
+            }
         };
-    }
+    },
+    [ActionTypes.REPORT_REASON_CREATE]: (message: string) => {
+        const match = /^Created post report reason (?<reason>.+)$/.exec(message);
 
-    if ((match = /^Created post report reason (?<reason>.+)$/.exec(message))) {
-        return {
-            blame,
-            date,
+        return match === null ? null : {
+            reportReason: {
+                reason: match.groups!.reason
+            }
+        };
+    },
+    [ActionTypes.REPORT_REASON_DELETE]: (message: string, messageElement: HTMLTableCellElement) => {
+        const match = /^Deleted post report reason (?<reason>.+) by .+$/.exec(message);
+
+        return match === null ? null : {
             reportReason: {
                 reason: match.groups!.reason
             },
-            type: ActionTypes.REPORT_REASON_CREATE
+            user: getUser(messageElement)!
         };
-    }
+    },
+    [ActionTypes.REPORT_REASON_UPDATE]: (message: string) => {
+        const match = /^Edited post report reason (?<old_reason>.+) to (?<new_reason>.+)$/.exec(message);
 
-    if ((match = /^Deleted post report reason (?<reason>.+) by .+$/.exec(message))) {
-        return {
-            blame,
-            date,
-            reportReason: {
-                reason: match.groups!.reason
-            },
-            user: getUser(messageElement)!,
-            type: ActionTypes.REPORT_REASON_DELETE
-        };
-    }
-
-    if ((match = /^Edited post report reason (?<old_reason>.+) to (?<new_reason>.+)$/.exec(message))) {
-        return {
-            blame,
-            date,
+        return match === null ? null : {
             reportReason: {
                 oldReason: match.groups!.old_reason,
                 newReason: match.groups!.new_reason
-            },
-            type: ActionTypes.REPORT_REASON_UPDATE
+            }
         };
-    }
-
+    },
     // this has different values depending on if the user is an admin (showing pattern instead of note), or if the whitelist entry is hidden (showing nothing)
-    if ((match = /^Created whitelist entry(?: '(?<entry>.+)')?$/.exec(message))) {
-        return {
-            blame,
-            date,
+    [ActionTypes.UPLOAD_WHITELIST_CREATE]: (message: string) => {
+        const match = /^Created whitelist entry(?: '(?<entry>.+)')?$/.exec(message);
+
+        return match === null ? null : {
             whitelist: {
                 entry: match.groups?.entry
-            },
-            type: ActionTypes.UPLOAD_WHITELIST_CREATE
+            }
         };
-    }
-
-    // this will only ever be shown to admins
-    if ((match = /^Edited whitelist entry '(?<old_pattern>.+)' -> '(?<new_pattern>.+)'$/.exec(message))) {
-        return {
-            blame,
-            date,
-            whitelist: {
-                oldPattern: match.groups!.old_pattern,
-                newPattern: match.groups!.new_pattern
-            },
-            type: ActionTypes.UPLOAD_WHITELIST_UPDATE
-        };
-    }
-
+    },
+    [ActionTypes.UPLOAD_WHITELIST_UPDATE]: (message: string) => {
+        let match: RegExpExecArray | null;
+        // admin only
+        if ((match = /^Edited whitelist entry '(?<old_pattern>.+)' -> '(?<new_pattern>.+)'$/.exec(message))) {
+            return {
+                whitelist: {
+                    oldPattern: match.groups!.old_pattern,
+                    newPattern: match.groups!.new_pattern
+                }
+            };
+            // this has different values depending on if the user is an admin (showing pattern instead of note), or if the whitelist entry is hidden (showing nothing)
+        } else if ((match = /^Edited whitelist entry(?: '(?<entry>.+)')?$/.exec(message))) {
+            return {
+                whitelist: {
+                    entry: match.groups?.entry
+                }
+            };
+        } else {
+            return null;
+        }
+    },
     // this has different values depending on if the user is an admin (showing pattern instead of note), or if the whitelist entry is hidden (showing nothing)
-    if ((match = /^Edited whitelist entry(?: '(?<entry>.+)')?$/.exec(message))) {
-        return {
-            blame,
-            date,
+    [ActionTypes.UPLOAD_WHITELIST_DELETE]: (message: string) => {
+        const match = /^Deleted whitelist entry(?: '(?<entry>.+)')?$/.exec(message);
+
+        return match === null ? null : {
             whitelist: {
                 entry: match.groups?.entry
-            },
-            type: ActionTypes.UPLOAD_WHITELIST_UPDATE
+            }
         };
-    }
+    },
+    [ActionTypes.HELP_CREATE]: (message: string) => {
+        const match = /^Created help entry (?<name>.+) \((?<wiki_page>.+)\)$/.exec(message);
 
-    // this has different values depending on if the user is an admin (showing pattern instead of note), or if the whitelist entry is hidden (showing nothing)
-    if ((match = /^Deleted whitelist entry(?: '(?<entry>.+)')?$/.exec(message))) {
-        return {
-            blame,
-            date,
-            whitelist: {
-                entry: match.groups?.entry
-            },
-            type: ActionTypes.UPLOAD_WHITELIST_DELETE
-        };
-    }
-
-    if ((match = /^Created help entry (?<name>.+) \((?<wiki_page>.+)\)/.exec(message))) {
-        return {
-            blame,
-            date,
+        return match === null ? null : {
             help: {
                 name:     match.groups!.name,
                 wikiPage: match.groups!.wiki_page
-            },
-            type: ActionTypes.HELP_CREATE
+            }
         };
-    }
+    },
+    [ActionTypes.HELP_UPDATE]: (message: string) => {
+        const match = /^Edited help entry (?<name>.+) \((?<wiki_page>.+)\)$/.exec(message);
 
-    if ((match = /^Edited help entry (?<name>.+) \((?<wiki_page>.+)\)/.exec(message))) {
-        return {
-            blame,
-            date,
+        return match === null ? null : {
             help: {
                 name:     match.groups!.name,
                 wikiPage: match.groups!.wiki_page
-            },
-            type: ActionTypes.HELP_UPDATE
+            }
         };
-    }
+    },
+    [ActionTypes.HELP_DELETE]: (message: string) => {
+        const match = /^Deleted help entry (?<name>.+) \((?<wiki_page>.+)\)$/.exec(message);
 
-    if ((match = /^Deleted help entry (?<name>.+) \((?<wiki_page>.+)\)/.exec(message))) {
-        return {
-            blame,
-            date,
+        return match === null ? null : {
             help: {
                 name:     match.groups!.name,
                 wikiPage: match.groups!.wiki_page
-            },
-            type: ActionTypes.HELP_DELETE
+            }
         };
-    }
+    },
+    [ActionTypes.WIKI_PAGE_DELETE]: (message: string) => {
+        const match = /^Deleted wiki page (?<name>.+)$/.exec(message);
 
-    if ((match = /^Deleted wiki page (?<name>.+)/.exec(message))) {
-        return {
-            blame,
-            date,
+        return match === null ? null : {
             wikiPage: {
                 name: match.groups!.name
-            },
-            type: ActionTypes.WIKI_PAGE_DELETE
+            }
         };
-    }
+    },
+    [ActionTypes.WIKI_PAGE_LOCK]: (message: string) => {
+        const match = /^Locked wiki page (?<name>.+)$/.exec(message);
 
-    if ((match = /^Locked wiki page (?<name>.+)/.exec(message))) {
-        return {
-            blame,
-            date,
+        return match === null ? null : {
             wikiPage: {
                 name: match.groups!.name
-            },
-            type: ActionTypes.WIKI_PAGE_LOCK
+            }
         };
-    }
+    },
+    [ActionTypes.WIKI_PAGE_UNLOCK]: (message: string) => {
+        const match = /^Unlocked wiki page (?<name>.+)$/.exec(message);
 
-    if ((match = /^Unlocked wiki page (?<name>.+)/.exec(message))) {
-        return {
-            blame,
-            date,
+        return match === null ? null : {
             wikiPage: {
                 name: match.groups!.name
-            },
-            type: ActionTypes.WIKI_PAGE_UNLOCK
+            }
         };
-    }
+    },
+    [ActionTypes.WIKI_PAGE_RENAME]: (message: string) => {
+        const match = /^Renamed wiki page \((?<old_name>.+) → (?<new_name>.+)\)$/.exec(message);
 
-    if ((match = /^Renamed wiki page \((?<old_name>.+) → (?<new_name>.+)\)/.exec(message))) {
-        return {
-            blame,
-            date,
+        return match === null ? null : {
             wikiPage: {
                 oldName: match.groups!.old_name,
                 newName: match.groups!.new_name
-            },
-            type: ActionTypes.WIKI_PAGE_RENAME
+            }
         };
-    }
+    },
+    [ActionTypes.MASS_UPDATE]: (message: string) => {
+        const match = /^Mass updated (?<old_tag>.+) -> (?<new_tag>.+)$/.exec(message);
 
-    if ((match = /^Mass updated (?<old_tag>.+) -> (?<new_tag>.+)$/.exec(message))) {
-        return {
-            blame,
-            date,
+        return match === null ? null : {
             oldTag: match.groups!.old_tag,
-            newTag: match.groups!.new_tag,
-            type:   ActionTypes.MASS_UPDATE
+            newTag: match.groups!.new_tag
         };
-    }
+    },
+    [ActionTypes.NUKE_TAG]: (message: string) => {
+        const match = /^Nuked tag (?<tag>.+)$/.exec(message);
 
-    if ((match = /^Nuked tag (?<tag>.+)$/.exec(message))) {
-        return {
-            blame,
-            date,
-            tag:  match.groups!.tag,
-            type: ActionTypes.NUKE_TAG
+        return match === null ? null : {
+            tag: match.groups!.tag
         };
-    }
+    },
+    [ActionTypes.MASCOT_CREATE]: (message: string) => {
+        const match = /^Created mascot #(?<id>\d+)$/.exec(message);
 
-    if ((match = /^Created mascot #(?<id>\d+)$/.exec(message))) {
-        return {
-            blame,
-            date,
+        return match === null ? null : {
             mascot: {
                 id: Number(match.groups!.id)
-            },
-            type: ActionTypes.MASCOT_CREATE
+            }
         };
-    }
+    },
+    [ActionTypes.MASCOT_UPDATE]: (message: string) => {
+        const match = /^Updated mascot #(?<id>\d+)$/.exec(message);
 
-    if ((match = /^Updated mascot #(?<id>\d+)$/.exec(message))) {
-        return {
-            blame,
-            date,
+        return match === null ? null : {
             mascot: {
                 id: Number(match.groups!.id)
-            },
-            type: ActionTypes.MASCOT_UPDATE
+            }
         };
-    }
+    },
+    [ActionTypes.MASCOT_DELETE]: (message: string) => {
+        const match = /^Deleted mascot #(?<id>\d+)$/.exec(message);
 
-    if ((match = /^Deleted mascot #(?<id>\d+)$/.exec(message))) {
-        return {
-            blame,
-            date,
+        return match === null ? null : {
             mascot: {
                 id: Number(match.groups!.id)
-            },
-            type: ActionTypes.MASCOT_DELETE
+            }
         };
-    }
+    },
+    [ActionTypes.POST_MOVE_FAVORITES]: (message: string) => {
+        const match = /^Moves favorites from post #(?<old_post>\d+) to post #(?<new_post>\d+)$/.exec(message);
 
-    if ((match = /^Processed bulk revert for .+ by .+$/.exec(message))) {
-        return {
-            blame,
-            date,
-            user: getUser(messageElement)!,
-            type: ActionTypes.BULK_REVERT
-        };
-    }
-
-    if ((match = /^Moves favorites from post #(?<old_post>\d+) to post #(?<new_post>\d+)$/.exec(message))) {
-        return {
-            blame,
-            date,
+        return match === null ? null : {
             favorites: {
                 oldPost: Number(match.groups!.old_post),
                 newPost: Number(match.groups!.new_post)
-            },
-            type: ActionTypes.POST_MOVE_FAVORITES
+            }
         };
-    }
+    },
+    [ActionTypes.POST_DELETE]: (message: string, messageElement: HTMLTableCellElement) => {
+        const match = /^Deleted post #(?<post>\d+) with reason:/.exec(message);
 
-    if ((match = /^Deleted post #(?<post>\d+) with reason:/.exec(message))) {
-        return {
-            blame,
-            date,
+        return match === null ? null : {
             post: {
                 id:         Number(match.groups!.post),
                 htmlReason: htmlReason(messageElement.innerHTML, "with reason:"),
                 textReason: textReason(messageElement.textContent!, "with reason:")
-            },
-            type: ActionTypes.POST_DELETE
+            }
         };
-    }
+    },
+    [ActionTypes.POST_UNDELETE]: (message: string) => {
+        const match = /^Undeleted post #(?<post>\d+)$/.exec(message);
 
-    if ((match = /^Undeleted post #(?<post>\d+)$/.exec(message))) {
-        return {
-            blame,
-            date,
+        return match === null ? null : {
             post: {
                 id: Number(match.groups!.post)
-            },
-            type: ActionTypes.POST_UNDELETE
+            }
         };
-    }
+    },
+    [ActionTypes.POST_DESTROY]: (message: string) => {
+        const match = /^Destroyed post #(?<post>\d+)$/.exec(message);
 
-    if ((match = /^Destroyed post #(?<post>\d+)$/.exec(message))) {
-        return {
-            blame,
-            date,
+        return match === null ? null : {
             post: {
                 id: Number(match.groups!.post)
-            },
-            type: ActionTypes.POST_DESTROY
+            }
         };
-    }
+    },
+    [ActionTypes.POST_RATING_LOCK]: (message: string) => {
+        const match = /^Post rating was (?<action>locked|unlocked) on post #(?<post>\d+)$/.exec(message);
 
-    if ((match = /^Post rating was (?<action>locked|unlocked) on post #(?<post>\d+)$/.exec(message))) {
-        return {
-            blame,
-            date,
+        return match === null ? null : {
             post: {
                 id:     Number(match.groups!.post),
-                action: match.groups!.action as "locked" | "unlocked"
-            },
-            type: ActionTypes.POST_RATING_LOCK
+                action: match.groups!.action
+            }
         };
-    }
+    },
+    [ActionTypes.POST_UNAPPROVE]: (message: string) => {
+        const match = /^Unapproved post #(?<post>\d+)$/.exec(message);
 
-    if ((match = /^Unapproved post #(?<post>\d+)$/.exec(message))) {
-        return {
-            blame,
-            date,
+        return match === null ? null : {
             post: {
                 id: Number(match.groups!.post)
-            },
-            type: ActionTypes.POST_UNAPPROVE
+            }
         };
-    }
+    },
+    [ActionTypes.POST_REPLACEMENT_ACCEPT]: (message: string) => {
+        const match = /^Post replacement for post #(?<post>\d+) was accepted$/.exec(message);
 
-    if ((match = /^Post replacement for post #(?<post>\d+) was accepted$/.exec(message))) {
-        return {
-            blame,
-            date,
+        return match === null ? null : {
             post: {
                 id: Number(match.groups!.post)
-            },
-            type: ActionTypes.POST_REPLACEMENT_ACCEPT
+            }
         };
-    }
+    },
+    [ActionTypes.POST_REPLACEMENT_REJECT]: (message: string) => {
+        const match = /^Post replacement for post #(?<post>\d+) was rejected$/.exec(message);
 
-    if ((match = /^Post replacement for post #(?<post>\d+) was rejected$/.exec(message))) {
-        return {
-            blame,
-            date,
+        return match === null ? null : {
             post: {
                 id: Number(match.groups!.post)
-            },
-            type: ActionTypes.POST_REPLACEMENT_REJECT
+            }
         };
-    }
+    },
+    [ActionTypes.POST_REPLACEMENT_DELETE]: (message: string) => {
+        const match = /^Post replacement for post #(?<post>\d+) was deleted$/.exec(message);
 
-    if ((match = /^Post replacement for post #(?<post>\d+) was deleted$/.exec(message))) {
-        return {
-            blame,
-            date,
+        return match === null ? null : {
             post: {
                 id: Number(match.groups!.post)
-            },
-            type: ActionTypes.POST_REPLACEMENT_DELETE
+            }
         };
     }
-
-    throw new Error(`Unknown action: ${message} (${messageElement.innerHTML})`);
-}
+} satisfies Record<ActionTypes, ((message: string, messageElement: HTMLTableCellElement) => object | null)>;

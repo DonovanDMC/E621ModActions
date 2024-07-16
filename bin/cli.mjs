@@ -15,7 +15,6 @@ program
     .option("-a, --action [action_type]", "The action to search for (e.g. nuke_tag)")
     .option("-l, --limit [limit]", "The maximum number of actions to return (default: 75, max: 320")
     .option("-p, --page [page]", "The page of results to return (max numbered: 750, supports a/b syntax)")
-    .option("--use-legacy-actions", "Use legacy actions (i.e. created_negative_record instead of user_feedback_create)")
     .option("-f, --format [format]", "The format to output results in (default: json, possible: json, json-formatted, json-pretty, csv, csv-split)", "json")
     .option("--debug", "Enable debug logging");
 
@@ -51,7 +50,7 @@ const results = await e6ModActions.search({
     action: type,
     limit: options.limit,
     page: options.page
-}, options.useLegacyActions);
+});
 
 switch(options.format) {
     case "json": {

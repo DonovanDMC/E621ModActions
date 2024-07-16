@@ -14,11 +14,23 @@ function standard<T extends ActionTypes = ActionTypes>(type: T, data: AnyAction)
     expect(data.blame.name).to.eq("Admin");
 }
 
+let currentType: ActionTypes | undefined;
+
 const client = new E621ModActions({
     _fetch(input) {
         assert(typeof input === "string");
-        const type = /search\[action]=(\w+)/.exec(decodeURIComponent(input))![1] as ActionTypes;
-        const data = testData[type] === null ? [] : (Array.isArray(testData[type]) ? testData[type] as Array<string> : [testData[type] as string]);
+        if (input.includes(".json")) {
+            const type = /search\[action]=(\w+)/.exec(decodeURIComponent(input))![1] as ActionTypes;
+            currentType = type;
+            const data = testData[type] === null ? [] : (Array.isArray(testData[type]) ? testData[type] as Array<string> : [testData[type]] as Array<string>);
+            return Promise.resolve(new Response(JSON.stringify(data.map(() => ({ ...testData._json, action: type }))), {
+                status:  200,
+                headers: {
+                    "Content-Type": "application/json"
+                }
+            }));
+        }
+        const data = testData[currentType!] === null ? [] : (Array.isArray(testData[currentType!]) ? testData[currentType!] as Array<string> : [testData[currentType!] as string]);
         return Promise.resolve(new Response(`<html><head><title> Mod Actions\n - e621</title></head><body><div id="c-mod-actions"><table><tbody>${data.map(d => `<tr>${testData._time}${testData._user}${d}</tr>`.replace(/&quot;/g, "\"")).join("")}</tbody></table></div></body></html>`, {
             status:  200,
             headers: {
@@ -27,6 +39,7 @@ const client = new E621ModActions({
         }));
     }
 });
+
 describe("Parsing", function () {
     it(ActionTypes.ARTIST_PAGE_RENAME, async function () {
         const [data = null] = await client.search({ action: ActionTypes.ARTIST_PAGE_RENAME });
@@ -400,17 +413,6 @@ describe("Parsing", function () {
         expect(twoWords.user.name).to.eq("test");
     });
 
-    // @TODO
-    it(ActionTypes.FORUM_TOPIC_UPDATE, async function () {
-        const [data = null] = await client.search({ action: ActionTypes.FORUM_TOPIC_UPDATE });
-
-        if (data === null) {
-            return this.skip();
-        }
-
-        throw new Error(`Test Not Implemented (${ActionTypes.FORUM_TOPIC_UPDATE})`);
-    });
-
     it(ActionTypes.HELP_CREATE, async function () {
         const [data = null] = await client.search({ action: ActionTypes.HELP_CREATE });
 
@@ -629,26 +631,6 @@ describe("Parsing", function () {
         expect(data.tagAlias.consequent).to.eq("test2");
     });
 
-    it(ActionTypes.TAG_ALIAS_APPROVE, async function () {
-        const [data = null] = await client.search({ action: ActionTypes.TAG_ALIAS_APPROVE });
-
-        if (data === null) {
-            return this.skip();
-        }
-
-        throw new Error(`Test Not implemented: ${ActionTypes.TAG_ALIAS_APPROVE}`);
-    });
-
-    it(ActionTypes.TAG_ALIAS_DELETE, async function () {
-        const [data = null] = await client.search({ action: ActionTypes.TAG_ALIAS_DELETE });
-
-        if (data === null) {
-            return this.skip();
-        }
-
-        throw new Error(`Test Not implemented: ${ActionTypes.TAG_ALIAS_DELETE}`);
-    });
-
     it(ActionTypes.TAG_ALIAS_UPDATE, async function () {
         const [status = null, approver_id = null, post_count = null, antecedent_name = null, consequent_name = null, combined = null] = await client.search({ action: ActionTypes.TAG_ALIAS_UPDATE });
 
@@ -716,26 +698,6 @@ describe("Parsing", function () {
         expect(data.tagImplication.id).to.eq(1);
         expect(data.tagImplication.antecedent).to.eq("test");
         expect(data.tagImplication.consequent).to.eq("test2");
-    });
-
-    it(ActionTypes.TAG_IMPLICATION_APPROVE, async function () {
-        const [data = null] = await client.search({ action: ActionTypes.TAG_IMPLICATION_APPROVE });
-
-        if (data === null) {
-            return this.skip();
-        }
-
-        throw new Error(`Test Not implemented: ${ActionTypes.TAG_IMPLICATION_APPROVE}`);
-    });
-
-    it(ActionTypes.TAG_IMPLICATION_DELETE, async function () {
-        const [data = null] = await client.search({ action: ActionTypes.TAG_IMPLICATION_DELETE });
-
-        if (data === null) {
-            return this.skip();
-        }
-
-        throw new Error(`Test Not implemented: ${ActionTypes.TAG_IMPLICATION_DELETE}`);
     });
 
     it(ActionTypes.TAG_IMPLICATION_UPDATE, async function () {
@@ -894,7 +856,7 @@ describe("Parsing", function () {
     });
 
     it(ActionTypes.CHANGED_USER_TEXT, async function () {
-        const [data = null] = await client.search({ action: ActionTypes.CHANGED_USER_TEXT }, true);
+        const [data = null] = await client.search({ action: ActionTypes.CHANGED_USER_TEXT });
 
         if (data === null) {
             return this.skip();
@@ -993,8 +955,6 @@ describe("Parsing", function () {
         standard(ActionTypes.USER_NAME_CHANGE, data);
         expect(data.user.id).to.eq(2);
         expect(data.user.name).to.eq("test2");
-        expect(data.oldName).to.eq("test");
-        expect(data.newName).to.eq("test2");
     });
 
     it(ActionTypes.USER_DELETE, async function () {
@@ -1253,17 +1213,6 @@ describe("Parsing", function () {
         expect(data.flagReason.reason).to.eq("Test");
     });
 
-    it(ActionTypes.BULK_REVERT, async function () {
-        const [data = null] = await client.search({ action: ActionTypes.BULK_REVERT });
-
-        if (data === null) {
-            return this.skip();
-        }
-
-
-        throw new Error(`Test not implemented: ${ActionTypes.BULK_REVERT}`);
-    });
-
     it(ActionTypes.POST_MOVE_FAVORITES, async function () {
         const [data = null] = await client.search({ action: ActionTypes.POST_MOVE_FAVORITES });
 
@@ -1389,7 +1338,7 @@ describe("Parsing", function () {
     });
 
     it(ActionTypes.CREATED_NEUTRAL_RECORD, async function () {
-        const [simple = null, complicated = null] = await client.search({ action: ActionTypes.CREATED_NEUTRAL_RECORD }, true);
+        const [simple = null, complicated = null] = await client.search({ action: ActionTypes.CREATED_NEUTRAL_RECORD });
 
         if (simple === null || complicated === null) {
             return this.skip();
@@ -1413,7 +1362,7 @@ describe("Parsing", function () {
     });
 
     it(ActionTypes.CREATED_NEGATIVE_RECORD, async function () {
-        const [simple = null, complicated = null] = await client.search({ action: ActionTypes.CREATED_NEGATIVE_RECORD }, true);
+        const [simple = null, complicated = null] = await client.search({ action: ActionTypes.CREATED_NEGATIVE_RECORD });
 
         if (simple === null || complicated === null) {
             return this.skip();
@@ -1437,7 +1386,7 @@ describe("Parsing", function () {
     });
 
     it(ActionTypes.CREATED_POSITIVE_RECORD, async function () {
-        const [simple = null, complicated = null] = await client.search({ action: ActionTypes.CREATED_POSITIVE_RECORD }, true);
+        const [simple = null, complicated = null] = await client.search({ action: ActionTypes.CREATED_POSITIVE_RECORD });
 
         if (simple === null || complicated === null) {
             return this.skip();

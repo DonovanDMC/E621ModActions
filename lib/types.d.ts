@@ -10,9 +10,15 @@ interface User {
     id: number;
     name: string;
 }
+interface PartialUser {
+    id: number;
+    name: string | null;
+}
+
 interface BaseAction<T extends ActionTypes> {
-    blame: User;
+    blame: PartialUser;
     date: Date;
+    id: number;
     type: T;
 }
 export interface PoolDeleteAction extends BaseAction<ActionTypes.POOL_DELETE> {
@@ -607,10 +613,6 @@ export interface MascotDeleteAction extends BaseAction<ActionTypes.MASCOT_DELETE
     };
 }
 
-export interface BulkRevertAction extends BaseAction<ActionTypes.BULK_REVERT> {
-    user: User;
-}
-
 export interface PostMoveFavoritesAction extends BaseAction<ActionTypes.POST_MOVE_FAVORITES> {
     favorites: {
         newPost: number;
@@ -669,7 +671,7 @@ export interface PostReplacementDeleteAction extends BaseAction<ActionTypes.POST
     };
 }
 
-export type AnyAction = PoolDeleteAction | BulkRevertAction | MassUpdateAction | NukeTagAction |
+export type AnyAction = PoolDeleteAction | MassUpdateAction | NukeTagAction |
 TakedownProcessAction | TakedownDeleteAction |
 IPBanCreateAction | IPBanDeleteAction |
 TicketUpdateAction | TicketClaimAction | TicketUnclaimAction |
@@ -704,7 +706,6 @@ export interface ActionMap {
     [ActionTypes.BLIP_HIDE]: BlipHideAction;
     [ActionTypes.BLIP_UNHIDE]: BlipUnhideAction;
     [ActionTypes.BLIP_UPDATE]: BlipUpdateAction;
-    [ActionTypes.BULK_REVERT]: BulkRevertAction;
     [ActionTypes.CHANGED_USER_TEXT]: ChangedUserTextAction;
     [ActionTypes.COMMENT_DELETE]: CommentDeleteAction;
     [ActionTypes.COMMENT_HIDE]: CommentHideAction;
@@ -731,7 +732,6 @@ export interface ActionMap {
     [ActionTypes.FORUM_TOPIC_UNHIDE]: ForumTopicUnhideAction;
     [ActionTypes.FORUM_TOPIC_UNLOCK]: ForumTopicUnlockAction;
     [ActionTypes.FORUM_TOPIC_UNSTICK]: ForumTopicUnstickAction;
-    [ActionTypes.FORUM_TOPIC_UPDATE]: never;
     [ActionTypes.HELP_CREATE]: HelpCreateAction;
     [ActionTypes.HELP_DELETE]: HelpDeleteAction;
     [ActionTypes.HELP_UPDATE]: HelpUpdateAction;
@@ -758,13 +758,9 @@ export interface ActionMap {
     [ActionTypes.SET_CHANGE_VISIBILITY]: SetChangeVisibilityAction;
     [ActionTypes.SET_DELETE]: SetDeleteAction;
     [ActionTypes.SET_UPDATE]: SetUpdateAction;
-    [ActionTypes.TAG_ALIAS_APPROVE]: never;
     [ActionTypes.TAG_ALIAS_CREATE]: TagAliasCreateAction;
-    [ActionTypes.TAG_ALIAS_DELETE]: never;
     [ActionTypes.TAG_ALIAS_UPDATE]: TagAliasUpdateAction;
-    [ActionTypes.TAG_IMPLICATION_APPROVE]: never;
     [ActionTypes.TAG_IMPLICATION_CREATE]: TagImplicationCreateAction;
-    [ActionTypes.TAG_IMPLICATION_DELETE]: never;
     [ActionTypes.TAG_IMPLICATION_UPDATE]: TagImplicationUpdateAction;
     [ActionTypes.TAKEDOWN_DELETE]: TakedownDeleteAction;
     [ActionTypes.TAKEDOWN_PROCESS]: TakedownProcessAction;
@@ -797,3 +793,12 @@ type Filtered = {
     [K in keyof ActionMap as K]: ActionMap[K] extends never ? never : ActionMap[K]["type"];
 };
 export type ValidActionTypes = Filtered[keyof Filtered];
+
+export interface JSONModAction {
+    action: ActionTypes;
+    created_at: string;
+    creator_id: number;
+    id: number;
+    updated_at: string;
+    values_old: null;
+}

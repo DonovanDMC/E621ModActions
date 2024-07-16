@@ -26,7 +26,6 @@ export enum ActionTypes {
     FORUM_TOPIC_UNLOCK = "forum_topic_unlock",
     FORUM_TOPIC_STICK = "forum_topic_stick",
     FORUM_TOPIC_UNSTICK = "forum_topic_unstick",
-    FORUM_TOPIC_UPDATE = "forum_topic_update",
     HELP_CREATE = "help_create",
     HELP_DELETE = "help_delete",
     HELP_UPDATE = "help_update",
@@ -43,12 +42,8 @@ export enum ActionTypes {
     SET_DELETE = "set_delete",
     SET_CHANGE_VISIBILITY = "set_change_visibility",
     TAG_ALIAS_CREATE = "tag_alias_create",
-    TAG_ALIAS_APPROVE = "tag_alias_approve",
-    TAG_ALIAS_DELETE = "tag_alias_delete",
     TAG_ALIAS_UPDATE = "tag_alias_update",
     TAG_IMPLICATION_CREATE = "tag_implication_create",
-    TAG_IMPLICATION_APPROVE = "tag_implication_approve",
-    TAG_IMPLICATION_DELETE = "tag_implication_delete",
     TAG_IMPLICATION_UPDATE = "tag_implication_update",
     TICKET_CLAIM = "ticket_claim",
     TICKET_UNCLAIM = "ticket_unclaim",
@@ -79,7 +74,6 @@ export enum ActionTypes {
     CREATED_FLAG_REASON = "created_flag_reason",
     EDITED_FLAG_REASON = "edited_flag_reason",
     DELETED_FLAG_REASON = "deleted_flag_reason",
-    BULK_REVERT = "bulk_revert",
     /** @deprecated This is a legacy action that has been replaces by post events. */
     POST_MOVE_FAVORITES = "post_move_favorites",
     /** @deprecated This is a legacy action that has been replaces by post events. */
@@ -109,10 +103,3 @@ export enum ActionTypes {
     /** @deprecated This is a legacy action type that has been replaced by `user_feedback_create`. */
     CREATED_NEUTRAL_RECORD = "created_neutral_record",
 }
-
-export const LegacyActions = [
-    ActionTypes.CREATED_NEGATIVE_RECORD,
-    ActionTypes.CREATED_NEUTRAL_RECORD,
-    ActionTypes.CREATED_POSITIVE_RECORD,
-    ActionTypes.CHANGED_USER_TEXT
-];

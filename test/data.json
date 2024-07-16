@@ -1,6 +1,13 @@
 {
   "_time": "<td class=&quot;dtext-container&quot;><time datetime=&quot;2023-01-01T00:00-0000&quot; title=&quot;2023-01-01 00:00-0000&quot;>2023-01-01 00:00</time></td>",
   "_user": "<td class=&quot;dtext-container&quot;><a class=&quot;user-admin user-post-approver user-post-uploader with-style&quot; rel=&quot;nofollow&quot; href=&quot;/users/1&quot;>Admin</a></td>",
+  "_json": {
+    "id": 1,
+    "creator_id": 1,
+    "created_at": "2023-01-01T00:00:00.000-00:00",
+    "updated_at": "2023-01-01T00:00:00.000-00:00",
+    "values_old": null
+  },
   "artist_page_rename": "<td class=&quot;dtext-container&quot;><div class=&quot;styled-dtext&quot;><p>Renamed artist page (<a rel=&quot;nofollow&quot; class=&quot;dtext-link&quot; href=&quot;/artists/show_or_new?name=test&quot;>test</a> -> <a rel=&quot;nofollow&quot; class=&quot;dtext-link&quot; href=&quot;/artists/show_or_new?name=test2&quot;>test2</a>)</p></div></td>",
   "artist_page_lock": "<td class=&quot;dtext-container&quot;><div class=&quot;styled-dtext&quot;><p>Locked artist page <a class=&quot;dtext-link dtext-id-link dtext-artist-id-link&quot; href=&quot;/artists/1&quot;>artist #1</a></p></div></td>",
   "artist_page_unlock": "<td class=&quot;dtext-container&quot;><div class=&quot;styled-dtext&quot;><p>Unlocked artist page <a class=&quot;dtext-link dtext-id-link dtext-artist-id-link&quot; href=&quot;/artists/1&quot;>artist #1</a></p></div></td>",
@@ -58,7 +65,6 @@
     "<td class=&quot;dtext-container&quot;><div class=&quot;styled-dtext&quot;><p>Unstickied <a class=&quot;dtext-link dtext-id-link dtext-forum-topic-id-link&quot; href=&quot;/forum_topics/1&quot;>topic #1</a> (with title Test) by <a rel=&quot;nofollow&quot; class=&quot;dtext-link&quot; href=&quot;/users/2&quot;>test</a></p></div></td>",
     "<td class=&quot;dtext-container&quot;><div class=&quot;styled-dtext&quot;><p>Unstickied <a class=&quot;dtext-link dtext-id-link dtext-forum-topic-id-link&quot; href=&quot;/forum_topics/1&quot;>topic #1</a> (with title Two Words) by <a rel=&quot;nofollow&quot; class=&quot;dtext-link&quot; href=&quot;/users/2&quot;>test</a></p></div></td>"
   ],
-  "forum_topic_update": null,
   "help_create": "<td class=&quot;dtext-container&quot;><div class=&quot;styled-dtext&quot;><p>Created help entry <a rel=&quot;nofollow&quot; class=&quot;dtext-link&quot; href=&quot;/help/test&quot;>test</a> (<a rel=&quot;nofollow&quot; class=&quot;dtext-link dtext-wiki-link&quot; href=&quot;/wiki_pages/show_or_new?title=help%3Atest&quot;>help:test</a>)</p></div></td>",
   "help_delete": "<td class=&quot;dtext-container&quot;><div class=&quot;styled-dtext&quot;><p>Deleted help entry <a rel=&quot;nofollow&quot; class=&quot;dtext-link&quot; href=&quot;/help/test&quot;>test</a> (<a rel=&quot;nofollow&quot; class=&quot;dtext-link dtext-wiki-link&quot; href=&quot;/wiki_pages/show_or_new?title=help%3Atest&quot;>help:test</a>)</p></div></td>",
   "help_update": "<td class=&quot;dtext-container&quot;><div class=&quot;styled-dtext&quot;><p>Edited help entry <a rel=&quot;nofollow&quot; class=&quot;dtext-link&quot; href=&quot;/help/test&quot;>test</a> (<a rel=&quot;nofollow&quot; class=&quot;dtext-link dtext-wiki-link&quot; href=&quot;/wiki_pages/show_or_new?title=help%3Atest&quot;>help:test</a>)</p></div></td>",
@@ -147,7 +153,7 @@
     "<td class=&quot;dtext-container&quot;><div class=&quot;styled-dtext&quot;><p>Changed <a rel=&quot;nofollow&quot; class=&quot;dtext-link&quot; href=&quot;/users/2&quot;>test</a> level from Member to Admin</p></div></td>",
     "<td class=&quot;dtext-container&quot;><div class=&quot;styled-dtext&quot;><p>Changed <a rel=&quot;nofollow&quot; class=&quot;dtext-link&quot; href=&quot;/users/2&quot;>test</a> level from Admin to Former Staff</p></div></td>"
   ],
-  "user_name_change": "<td class=&quot;dtext-container&quot;><div class=&quot;styled-dtext&quot;><p>Changed name of <a rel=&quot;nofollow&quot; class=&quot;dtext-link&quot; href=&quot;/users/2&quot;>test2</a> from test to test2</p></div></td>",
+  "user_name_change": "<td class=&quot;dtext-container&quot;><div class=&quot;styled-dtext&quot;><p>Changed name of <a rel=&quot;nofollow&quot; class=&quot;dtext-link&quot; href=&quot;/users/2&quot;>test2</a></p></div></td>",
   "user_delete": "<td class=&quot;dtext-container&quot;><div class=&quot;styled-dtext&quot;><p>Deleted user <a rel=&quot;nofollow&quot; class=&quot;dtext-link&quot; href=&quot;/users/2&quot;>test</a></p></div></td>",
   "user_ban": [
     "<td class=&quot;dtext-container&quot;><div class=&quot;styled-dtext&quot;><p>Banned <a rel=&quot;nofollow&quot; class=&quot;dtext-link&quot; href=&quot;/users/2&quot;>test</a> permanently</p></div></td>",
@@ -178,7 +184,6 @@
   "created_flag_reason": "<td class=&quot;dtext-container&quot;><div class=&quot;styled-dtext&quot;><p>Created flag reason #1 (Test)</p></div></td>",
   "edited_flag_reason": "<td class=&quot;dtext-container&quot;><div class=&quot;styled-dtext&quot;><p>Edited flag reason #1 (Test)</p></div></td>",
   "deleted_flag_reason": "<td class=&quot;dtext-container&quot;><div class=&quot;styled-dtext&quot;><p>Deleted flag reason #1 (Test)</p></div></td>",
-  "bulk_revert": null,
   "post_move_favorites": "<td class=&quot;dtext-container&quot;><div class=&quot;styled-dtext&quot;><p>Moves favorites from <a class=&quot;dtext-link dtext-id-link dtext-post-id-link&quot; href=&quot;/posts/1&quot;>post #1</a> to <a class=&quot;dtext-link dtext-id-link dtext-post-id-link&quot; href=&quot;/posts/2&quot;>post #2</a></p></div></td>",
   "post_delete": [
     "<td class=&quot;dtext-container&quot;><div class=&quot;styled-dtext&quot;><p>Deleted <a class=&quot;dtext-link dtext-id-link dtext-post-id-link&quot; href=&quot;/posts/1&quot;>post #1</a> with reason: Testing Reason</p></div></td>",

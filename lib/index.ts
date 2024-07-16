@@ -1,12 +1,19 @@
 /// <reference lib="dom" />
 import parse from "./parser.js";
-import { LegacyActions, type ActionTypes } from "./Constants.js";
+import { type ActionTypes } from "./Constants.js";
 import Debug from "./Debug.js";
 import Timer from "./Timer.js";
-import type { ActionMap } from "./types.js";
+import type { ActionMap, JSONModAction } from "./types.js";
 import { JSDOM } from "jsdom";
 import { readFile } from "node:fs/promises";
 const { version } = JSON.parse(await readFile(new URL("../package.json", import.meta.url), "utf8")) as { version: string; };
+
+interface BasicResponse {
+    headers: Headers;
+    status: number;
+    statusText: string;
+    text(): Promise<string>;
+}
 
 
 const MakeError = (name: string) => class extends Error {
@@ -42,11 +49,7 @@ export interface ClientOptions {
      */
     userAgent?: string;
     /** A [fetch compatible](https://nodejs.org/dist/latest-v18.x/docs/api/globals.html) request handler. See the readme or code for a bare minimum of what needs to be implemented. */
-    _fetch?(this: void, input: string, init: { headers: Record<string, string>; }): Promise<{
-        status: number;
-        statusText: string;
-        text(): Promise<string>;
-    }>;
+    _fetch?(this: void, input: string, init: { headers: Record<string, string>; }): Promise<BasicResponse>;
 }
 
 export interface SearchOptions<T extends ActionTypes = ActionTypes> {
@@ -86,6 +89,30 @@ export default class E621ModActions {
         };
     }
 
+    private async _getHtml(ids: Array<number>) {
+        const auth = this.options.authUser && this.options.authKey ? `Basic ${Buffer.from(`${this.options.authUser}:${this.options.authKey}`).toString("base64")}` : null;
+        const qs = `?search[id]=${ids.join(",")}`;
+        Debug(`<- GET /mod_actions${qs}`);
+        const start = Timer.now();
+        const res = await this.options._fetch(`${this.options.baseURL}/mod_actions${qs}`, {
+            headers: {
+                "User-Agent": this.options.userAgent,
+                ...(auth ? { Authorization: auth } : {})
+            }
+        });
+        Debug(`<- GET /mod_actions${qs} (${Timer.calc(start, Timer.now())})`);
+
+        const html = (await res.text()).replace(/<br(?: \/)?>/g, "\n");
+        await this._statusCheck(res, html);
+
+        try {
+            const { window: { document } } = new JSDOM(html);
+            return Array.from(document.querySelectorAll<HTMLTableRowElement>("div#c-mod-actions table tbody tr"));
+        } catch (err) {
+            throw new ParsingError("Parsing the modactions page failed.", { cause: err });
+        }
+    }
+
     private async _request(options?: SearchOptions) {
         const query = new URLSearchParams();
         if (options?.page) {
@@ -101,15 +128,15 @@ export default class E621ModActions {
         }
         const qs = query.toString() === "" ? "" : `?${query.toString()}`;
         const auth = this.options.authUser && this.options.authKey ? `Basic ${Buffer.from(`${this.options.authUser}:${this.options.authKey}`).toString("base64")}` : null;
-        Debug(`<- GET /mod_actions${qs}`);
+        Debug(`<- GET /mod_actions.json${qs}`);
         const start = Timer.now();
-        const res = await this.options._fetch(`${this.options.baseURL}/mod_actions${qs}`, {
+        const res = await this.options._fetch(`${this.options.baseURL}/mod_actions.json${qs}`, {
             headers: {
                 "User-Agent": this.options.userAgent,
                 ...(auth ? { Authorization: auth } : {})
             }
         });
-        Debug(`<- GET /mod_actions${qs} (${Timer.calc(start, Timer.now())})`);
+        Debug(`<- GET /mod_actions.json${qs} (${Timer.calc(start, Timer.now())})`);
 
         if (res.status !== 200) {
             if (res.status === 503) {
@@ -125,31 +152,52 @@ export default class E621ModActions {
             throw new NonOKStatusError(`Request failed with status: ${res.status} ${res.statusText}`);
         }
 
-        const html = (await res.text()).replace(/<br(?: \/)?>/g, "\n");
-        if (!this.options.disableTitleCheck) {
+        const text = (await res.text()).replace(/<br(?: \/)?>/g, "\n");
+        await this._statusCheck(res, text);
+        const json = JSON.parse(text) as Array<JSONModAction & { html: HTMLTableRowElement; }>;
+        for (let i = 0; i < json.length; i += 100) {
+            const ids = json.slice(i, i + 100).map(e => e.id);
+            const html = await this._getHtml(ids);
+            if (html.length !== ids.length) {
+                throw new ParsingError(`Expected ${ids.length} rows, got ${html.length}`);
+            }
+            for (let j = 0; j < ids.length; j++) {
+                json[i + j].html = html[j];
+            }
+        }
+
+        return json;
+    }
+
+    private async _statusCheck(res: BasicResponse, content: string) {
+        const html = res.headers.get("content-type")?.includes("text/html");
+        if (res.status !== 200) {
+            if (res.status === 503 && html) {
+                if (content.includes(RatelimitedContent)) {
+                    throw new RateLimitedError("You are being rate limited. Please wait a few minutes and try again.");
+                }
+
+                if (content.includes(MaintenanceContent)) {
+                    throw new MaintenanceError("E621 is currently undergoing maintenance. Please try again later.");
+                }
+            }
+            throw new NonOKStatusError(`Request failed with status: ${res.status} ${res.statusText}`);
+        }
+
+        if (html && !this.options.disableTitleCheck) {
             // hacky test for captchas
-            const title = /<title>(?<title>.+)<\/title>/is.exec(html)?.groups?.title.trim().replace(/\r?\n/g, "");
+            const title = /<title>(?<title>.+)<\/title>/is.exec(content)?.groups?.title.trim().replace(/\r?\n/g, "");
             if (title === undefined || title !== "Mod Actions - e621") {
                 throw new ParsingError(`There seems to have been an issue loading the mod actions page. Expected title="Mod Actions - e621", got ${title === undefined ? "none" : `title="${title}"`}`);
             }
         }
-
-        try {
-            const { window: { document } } = new JSDOM(html);
-            return Array.from(document.querySelectorAll<HTMLTableRowElement>("div#c-mod-actions table tbody tr"));
-        } catch (err) {
-            throw new ParsingError("Parsing the modactions page failed.", { cause: err });
-        }
     }
 
-    async search<T extends ActionTypes = ActionTypes>(options?: SearchOptions<T>, useLegacyActions?: boolean) {
-        if (options?.action && LegacyActions.includes(options.action) && !useLegacyActions) {
-            useLegacyActions = true;
-        }
+    async search<T extends ActionTypes = ActionTypes>(options?: SearchOptions<T>) {
         const elements = await this._request(options);
-        return elements.map(element => parse(element, useLegacyActions) as ActionMap[T]);
+        return elements.map(j => parse(j, j.html) as ActionMap[T]);
     }
 }
 
-export { ActionTypes, LegacyActions } from "./Constants.js";
+export { ActionTypes } from "./Constants.js";
 export type * from "./types.js";
