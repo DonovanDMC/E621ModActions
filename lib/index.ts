@@ -91,7 +91,7 @@ export default class E621ModActions {
 
     private async _getHtml(ids: Array<number>) {
         const auth = this.options.authUser && this.options.authKey ? `Basic ${Buffer.from(`${this.options.authUser}:${this.options.authKey}`).toString("base64")}` : null;
-        const qs = `?search[id]=${ids.join(",")}`;
+        const qs = `?search[id]=${ids.join(",")}&limit=${ids.length}`;
         Debug(`<- GET /mod_actions${qs}`);
         const start = Timer.now();
         const res = await this.options._fetch(`${this.options.baseURL}/mod_actions${qs}`, {
@@ -100,7 +100,7 @@ export default class E621ModActions {
                 ...(auth ? { Authorization: auth } : {})
             }
         });
-        Debug(`<- GET /mod_actions${qs} (${Timer.calc(start, Timer.now())})`);
+        Debug(`-> GET /mod_actions${qs} (${Timer.calc(start, Timer.now())})`);
 
         const html = (await res.text()).replace(/<br(?: \/)?>/g, "\n");
         await this._statusCheck(res, html);
@@ -136,7 +136,7 @@ export default class E621ModActions {
                 ...(auth ? { Authorization: auth } : {})
             }
         });
-        Debug(`<- GET /mod_actions.json${qs} (${Timer.calc(start, Timer.now())})`);
+        Debug(`-> GET /mod_actions.json${qs} (${Timer.calc(start, Timer.now())})`);
 
         if (res.status !== 200) {
             if (res.status === 503) {
